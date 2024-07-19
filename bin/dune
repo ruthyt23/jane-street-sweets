@@ -1,0 +1,4 @@
+(executable
+ (public_name jane_street_sweets)
+ (name main)
+ (libraries jane_street_sweets))
