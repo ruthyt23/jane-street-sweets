@@ -87,6 +87,11 @@ type t =
       )
   ;;
 
+  let win_check (player : Player.t) = 
+    let first_commodity = List.nth_exn player.hand 0 in
+    List.for_all player.hand ~f:(fun commodity -> Commodity.equal first_commodity commodity)
+  ;;
+
 let _print_hands t = 
 List.iter t.players ~f:(fun player -> Player.print_hand player )
 ;;
@@ -118,6 +123,11 @@ let get_player game player_id =
   
 ;;
 
+let game_over t (player : Player.t) = 
+t.game_state := Game_over {winner = Some player};
+Core.printf "GAME OVER! Winner: %d" (player.player_id);
+;;
+
 let start_game num_players = 
   let game = create_game num_players in
   generate_player_hands game; 
@@ -137,7 +147,9 @@ let start_game num_players =
        Core.print_endline "How many would you like to trade? ";
        let num_cards = Int.of_string (In_channel.input_line_exn In_channel.stdin) in
        handle_trade game player commodity_to_trade num_cards;
-       print_endline "";
+       match win_check player with
+       | false -> ()
+       | true -> (game_over game player; game_continues := false)
     )
   )
   done
