@@ -5,15 +5,20 @@ module Commodity = struct
     | Fairlife
     | Pocky
     | Water
+    | Boba
+    | Mango
+    | Starburst
+    | Hint
+    | Gum
+    | Kitkat
   [@@deriving equal, enumerate, compare, sexp_of, hash]
-
-  let all_commodities = all
 
   (* game_commodities --> generates the n commodities that will be traded in
      the game based on n players *)
   let game_commodities num_players =
-    List.init num_players ~f:(fun index ->
-      List.nth_exn all_commodities index)
+    let commodity_array = Array.of_list all in
+    Array.permute commodity_array;
+    List.init num_players ~f:(fun index -> Array.get commodity_array index)
   ;;
 
   let to_string t =
@@ -21,6 +26,12 @@ module Commodity = struct
     | Fairlife -> "Fairlife"
     | Pocky -> "Pocky"
     | Water -> "Water"
+    | Boba -> "Boba"
+    | Mango -> "Mango"
+    | Starburst -> "Starburst"
+    | Hint -> "Hint"
+    | Gum -> "Gum"
+    | Kitkat -> "Kitkat"
   ;;
 
   let of_string str =
@@ -28,6 +39,12 @@ module Commodity = struct
     | "Fairlife" -> Fairlife
     | "Pocky" -> Pocky
     | "Water" -> Water
+    | "Boba" -> Boba
+    | "Mango" -> Mango
+    | "Starburst" -> Starburst
+    | "Hint" -> Hint
+    | "Gum" -> Gum
+    | "Kitkat" -> Kitkat
     | _ -> failwith "not a valid commodity"
   ;;
 end
@@ -94,24 +111,6 @@ let generate_player_hands t =
     in
     player.hand <- hand)
 ;;
-
-(* OLD HANDLE_TRADE - replacing player's card with random cards let
-   handle_trade t (player : Player.t) commodity_to_trade num_cards = let
-   player_hand = player.hand in let num_of_commodity = List.length
-   ((List.filter player_hand ~f:(fun commodity -> Commodity.equal commodity
-   commodity_to_trade))) in if not (num_of_commodity = num_cards) then
-   Core.print_endline "Trade Rejected: Invalid number of cards." else ( let
-   commodities_being_traded = List.filter (Hashtbl.keys t.commodities_traded)
-   ~f:(fun commodity -> not (Commodity.equal commodity commodity_to_trade))
-   in let new_commodity = List.random_element_exn commodities_being_traded in
-   let hand_with_new_commodity = List.init num_cards ~f:(fun _ ->
-   new_commodity) in let hand_without_old_commodity = List.filter player_hand
-   ~f:(fun player_commodity -> not (Commodity.equal player_commodity
-   commodity_to_trade)) in
-
-   player.hand <- (hand_without_old_commodity @ hand_with_new_commodity);
-   Core.print_endline "Trade successful! New player hand: ";
-   Player.print_hand player; ) ;; *)
 
 let change_hand ~(player : Player.t) ~old_commodity ~new_commodity ~num_cards
   =
@@ -208,6 +207,7 @@ let start_game num_players =
   let game = create_game num_players in
   generate_player_hands game;
   let game_continues = ref true in
+  Core.print_endline "*** WELCOME TO PIT! ***";
   while !game_continues do
     Core.print_endline
       "Would you like to trade or end the game? (trade / end) ";
@@ -247,7 +247,10 @@ let start =
       let num_players =
         flag "players" (required Command.Param.int) ~doc:"Number of players"
       in
-      fun () -> start_game num_players]
+      fun () ->
+        if num_players < 3 || num_players > 9
+        then failwith "Invalid number of players: must be 3-9"
+        else start_game num_players]
 ;;
 
 let command = Command.group ~summary:"Driver" [ "start", start ]

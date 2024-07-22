@@ -5,12 +5,20 @@ module Commodity = struct
     | Fairlife
     | Pocky
     | Water
+    | Boba
+    | Mango
+    | Starburst
+    | Hint
+    | Gum
+    | Kitkat
   [@@deriving equal, enumerate, compare, sexp_of, hash]
 
   (* game_commodities --> generates the n commodities that will be traded in
      the game based on n players *)
   let game_commodities num_players =
-    List.init num_players ~f:(fun index -> List.nth_exn all index)
+    let commodity_array = Array.of_list all in
+    Array.permute commodity_array;
+    List.init num_players ~f:(fun index -> Array.get commodity_array index)
   ;;
 
   let to_string t =
@@ -18,6 +26,12 @@ module Commodity = struct
     | Fairlife -> "Fairlife"
     | Pocky -> "Pocky"
     | Water -> "Water"
+    | Boba -> "Boba"
+    | Mango -> "Mango"
+    | Starburst -> "Starburst"
+    | Hint -> "Hint"
+    | Gum -> "Gum"
+    | Kitkat -> "Kitkat"
   ;;
 
   let of_string str =
@@ -25,6 +39,12 @@ module Commodity = struct
     | "Fairlife" -> Fairlife
     | "Pocky" -> Pocky
     | "Water" -> Water
+    | "Boba" -> Boba
+    | "Mango" -> Mango
+    | "Starburst" -> Starburst
+    | "Hint" -> Hint
+    | "Gum" -> Gum
+    | "Kitkat" -> Kitkat
     | _ -> failwith "not a valid commodity"
   ;;
 end
@@ -227,7 +247,10 @@ let start =
       let num_players =
         flag "players" (required Command.Param.int) ~doc:"Number of players"
       in
-      fun () -> start_game num_players]
+      fun () ->
+        if num_players < 3 || num_players > 9
+        then failwith "Invalid number of players: must be 3-9"
+        else start_game num_players]
 ;;
 
 let command = Command.group ~summary:"Driver" [ "start", start ]
