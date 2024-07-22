@@ -1,6 +1,6 @@
 (lang dune 3.15)
 
-(name jane_street_sweets)
+(name game)
 
 (generate_opam_files true)
 
@@ -15,12 +15,13 @@
 
 (documentation https://url/to/documentation)
 
-(package
- (name jane_street_sweets)
- (synopsis "A short synopsis")
- (description "A longer description")
- (depends ocaml dune)
- (tags
-  (topics "to describe" your project)))
+; (package
+;  (allow_empty)
+;  (name game)
+;  (synopsis "A short synopsis")
+;  (description "A longer description")
+;  (depends ocaml dune)
+;  (tags
+;   (topics "to describe" your project)))
 
 ; See the complete stanza docs at https://dune.readthedocs.io/en/stable/dune-files.html#dune-project

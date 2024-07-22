@@ -1,6 +1,6 @@
 (library
- (name jane_street_sweets)
- (libraries core)
+ (name game_lib)
+ (libraries async core core_unix.command_unix)
  (inline_tests)
  (preprocess
   (pps ppx_jane)))

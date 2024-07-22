@@ -3,9 +3,6 @@ lib: [
   "_build/install/default/lib/jane_street_sweets/dune-package"
   "_build/install/default/lib/jane_street_sweets/opam"
 ]
-bin: [
-  "_build/install/default/bin/jane_street_sweets"
-]
 doc: [
   "_build/install/default/doc/jane_street_sweets/README.md"
 ]
