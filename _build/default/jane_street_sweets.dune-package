@@ -1,4 +1,0 @@
-(lang dune 3.15)
-(name jane_street_sweets)
-(sections (lib .) (doc ../../doc/jane_street_sweets))
-(files (lib (META dune-package opam)) (doc (README.md)))

@@ -1,8 +1,0 @@
-lib: [
-  "_build/install/default/lib/jane_street_sweets/META"
-  "_build/install/default/lib/jane_street_sweets/dune-package"
-  "_build/install/default/lib/jane_street_sweets/opam"
-]
-doc: [
-  "_build/install/default/doc/jane_street_sweets/README.md"
-]
