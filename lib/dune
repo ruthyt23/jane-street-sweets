@@ -1,6 +1,6 @@
 (library
  (name game_lib)
- (libraries async core core_unix.command_unix)
+ (libraries async core core_unix.command_unix fzf)
  (inline_tests)
  (preprocess
   (pps ppx_jane)))

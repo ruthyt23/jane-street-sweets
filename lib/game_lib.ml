@@ -1,4 +1,6 @@
+open! Async
 open! Core
+open! Fzf
 
 module Commodity = struct
   type t =
@@ -59,9 +61,9 @@ module Player = struct
   (* let update_hand = 0 ;; *)
 
   let print_hand t =
-    Core.printf "Hand for player %d: " t.player_id;
+    printf "Hand for player %d: " t.player_id;
     List.iter t.hand ~f:(fun commodity ->
-      Core.printf "%s  " (Commodity.to_string commodity))
+      printf "%s  " (Commodity.to_string commodity))
   ;;
 end
 
@@ -87,7 +89,7 @@ let get_player game player_id =
   in
   match player_match_opt with
   | Some player -> player
-  | None -> failwith "No player matches given player_id"
+  | None -> failwith "No player matches given ID"
 ;;
 
 let generate_player_hands t =
@@ -131,8 +133,8 @@ let handle_trade t (player : Player.t) commodity_to_trade num_cards =
       (List.filter player_hand ~f:(fun commodity ->
          Commodity.equal commodity commodity_to_trade))
   in
-  if not (num_of_commodity = num_cards)
-  then Core.print_endline "Trade Rejected: Invalid number of cards."
+  if num_of_commodity < num_cards || num_cards < 1 || num_cards > 4
+  then print_endline "Trade Rejected: Invalid number of cards - must be 1-4."
   else if List.mem
             (Hashtbl.keys t.open_trades)
             num_of_commodity
@@ -143,7 +145,7 @@ let handle_trade t (player : Player.t) commodity_to_trade num_cards =
     in
     let other_player = get_player t other_player_id in
     match Player.equal player other_player with
-    | true -> Core.print_endline "Trade Rejected: Offer already in the book."
+    | true -> print_endline "Trade Rejected: Offer already in the book."
     | false ->
       change_hand
         ~player
@@ -155,7 +157,7 @@ let handle_trade t (player : Player.t) commodity_to_trade num_cards =
         ~old_commodity:other_commodity
         ~new_commodity:commodity_to_trade
         ~num_cards;
-      Core.printf
+      printf
         "Trade of %d cards successful between player %d and %d \n"
         num_cards
         player.player_id
@@ -165,7 +167,7 @@ let handle_trade t (player : Player.t) commodity_to_trade num_cards =
       t.open_trades
       ~key:num_cards
       ~data:(player.player_id, commodity_to_trade);
-    Core.print_endline "No matching trade found - offer placed on book")
+    print_endline "No matching trade found - offer placed on book")
 ;;
 
 let win_check (player : Player.t) =
@@ -200,48 +202,82 @@ let create_game num_players =
 
 let game_over t (player : Player.t) =
   t.game_state := Game_over { winner = Some player };
-  Core.printf "GAME OVER! Winner: %d \n" player.player_id
+  printf "GAME OVER! Winner: %d \n" player.player_id
 ;;
 
 let start_game num_players =
   let game = create_game num_players in
   generate_player_hands game;
+  let player_string_list =
+    List.map game.players ~f:(fun player -> Int.to_string player.player_id)
+  in
+  let num_cards_string_list =
+    List.init 4 ~f:(fun num -> Int.to_string (num + 1))
+  in
   let game_continues = ref true in
-  Core.print_endline "*** WELCOME TO PIT! ***";
-  while !game_continues do
-    Core.print_endline
-      "Would you like to trade or end the game? (trade / end) ";
-    let response = In_channel.input_line_exn In_channel.stdin in
-    if String.equal response "end"
-    then (
-      game.game_state := Game_State.Game_over { winner = None };
-      game_continues := false)
-    else (
-      Core.print_endline "What is your player ID? ";
-      let id = Int.of_string (In_channel.input_line_exn In_channel.stdin) in
+  print_endline "*** WELCOME TO PIT! ***\nGame Start\n";
+  Deferred.repeat_until_finished () (fun _ ->
+    print_endline "What is your player ID? ";
+    let selection_for_playerid = Pick_from.inputs player_string_list in
+    let%bind string_id_opt =
+      pick_one
+        selection_for_playerid
+        ~prompt_at_top:()
+        ~height:(num_players + 3)
+    in
+    match string_id_opt |> ok_exn with
+    | None -> return (`Finished ())
+    | Some string_id ->
+      let id = Int.of_string string_id in
       let player = get_player game id in
       Player.print_hand player;
-      Core.print_endline "\nWhat commodity would you like to trade? ";
-      let commodity_to_trade =
-        Commodity.of_string (In_channel.input_line_exn In_channel.stdin)
+      print_endline "\nWhat commodity would you like to trade? ";
+      let commodities_string_list =
+        List.dedup_and_sort player.hand ~compare:Commodity.compare
+        |> List.map ~f:(fun commodity -> Commodity.to_string commodity)
       in
-      Core.print_endline "How many would you like to trade? ";
-      let num_cards =
-        Int.of_string (In_channel.input_line_exn In_channel.stdin)
+      let selection_for_commodities =
+        Pick_from.inputs commodities_string_list
       in
-      handle_trade game player commodity_to_trade num_cards;
-      List.iter game.players ~f:(fun player ->
-        match win_check player with
-        | false -> ()
-        | true ->
-          game_over game player;
-          game_continues := false);
-      print_endline "")
-  done
+      let%bind commodity_opt =
+        pick_one
+          selection_for_commodities
+          ~prompt_at_top:()
+          ~height:(List.length commodities_string_list + 3)
+      in
+      (match commodity_opt |> ok_exn with
+       | None -> return (`Finished ())
+       | Some commodity ->
+         print_endline "How many would you like to trade? (1-4)";
+         let selection_for_numcards =
+           Pick_from.inputs num_cards_string_list
+         in
+         let%map num_cards_opt =
+           pick_one selection_for_numcards ~prompt_at_top:() ~height:7
+         in
+         (match num_cards_opt |> ok_exn with
+          | None -> `Finished ()
+          | Some cards ->
+            let num_cards = Int.of_string cards in
+            handle_trade
+              game
+              player
+              (Commodity.of_string commodity)
+              num_cards;
+            List.iter game.players ~f:(fun player ->
+              match win_check player with
+              | false -> ()
+              | true ->
+                game_over game player;
+                game_continues := false);
+            print_endline "";
+            (match !game_continues with
+             | true -> `Repeat ()
+             | false -> `Finished ()))))
 ;;
 
 let start =
-  Command.basic
+  Async.Command.async
     ~summary:"Start a game"
     [%map_open.Command
       let num_players =
