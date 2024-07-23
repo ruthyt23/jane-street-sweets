@@ -111,7 +111,7 @@ let generate_player_hands t =
           ~data:(current_num - 1);
         chosen_commodity)
     in
-    player.hand <- hand)
+    player.hand <- List.sort ~compare:Commodity.compare hand)
 ;;
 
 let change_hand ~(player : Player.t) ~old_commodity ~new_commodity ~num_cards
@@ -123,7 +123,10 @@ let change_hand ~(player : Player.t) ~old_commodity ~new_commodity ~num_cards
     List.filter player.hand ~f:(fun player_commodity ->
       not (Commodity.equal player_commodity old_commodity))
   in
-  player.hand <- hand_without_old_commodity @ list_of_new_commodity
+  player.hand
+  <- List.sort
+       ~compare:Commodity.compare
+       (hand_without_old_commodity @ list_of_new_commodity)
 ;;
 
 let handle_trade t (player : Player.t) commodity_to_trade num_cards =
