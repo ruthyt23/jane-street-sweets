@@ -1,43 +1,40 @@
-open! Async
 open! Core
+open! Async
 open! Fzf
 
-module Waiting_room = struct
-  type t =
-    { target_num_players : int
-    ; current_games : (int, Game_lib.t) Hashtbl.t
-    }
+let waiting_handle (_client : unit) (query : Waiting_room.Query.t) =
+  
+;; 
 
-  let check_for_valid_game t =
-    let curr_num_players = Queue.length t.current_players in
-    equal t.target_num_players curr_num_players
-  ;;
-
-  let add_new_player t new_player =
-    Queue.enqueue t.current_players new_player
-  ;;
-
-  (* Add functionality to remove a certain player if they disconnect later
-     on*)
-end
-
-let start_game_impl client (query : Client.Start_game.Query.t) =
-  (* Make this connection confirmation message more descriptive later on *)
-  printf "A client has joined the game";
-  ignore client;
-  ignore query
+let game_data_handle (_client : unit) (query : Game_data.Query.t) =
 ;;
 
-let command =
+let make_trade_handle (_client : unit) (query : Make_trade.Query.t) =
+;;
+
+let implementations =
+  Rpc.Implementations.create_exn
+    ~on_unknown_rpc:`Close_connection
+    ~implementations:
+      [ Rpc.Rpc.implement Waiting_room.rpc waiting_handle
+      ; Rpc.Rpc.implement Game_data.rpc game_data_handle
+      ; Rpc.Rpc.implement Make_trade.rpc make_trade_handle
+      ]
+;;
+
+let start_game =
   Command.async
-    ~summary:"Client"
+    ~summary:"Play"
     (let%map_open.Command () = return ()
-     and port = flag "-port" (required int) ~doc:"INT server port" in
+     and port = flag "-port" (required int) ~doc:"_ port to listen on" in
      fun () ->
        let%bind server =
          Rpc.Connection.serve
            ~implementations
            ~initial_connection_state:(fun _client_identity _client_addr ->
+             (* This constructs the "client" values which are passed to the
+                implementation function above. We're just using unit for
+                now. *)
              ())
            ~where_to_listen:(Tcp.Where_to_listen.of_port port)
            ()

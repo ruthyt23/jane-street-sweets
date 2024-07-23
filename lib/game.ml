@@ -6,15 +6,16 @@ module Game_State = struct
   type t =
     | In_progress
     | Game_over of { winner : Player.t option }
-  [@@deriving equal]
+  [@@deriving equal, sexp_of, bin_io]
 end
 
 type t =
   { players : Player.t list
   ; game_state : Game_State.t ref
-  ; commodities_traded : (Commodity.t, int) Hashtbl.t
+  ; mutable commodities_traded : int Commodity.Map.t
   ; open_trades : (int, int * Commodity.t) Hashtbl.t
   }
+[@@deriving sexp_of, bin_io]
 
 let create_game num_players =
   (* Number of players is equal to the number of commodites traded *)
