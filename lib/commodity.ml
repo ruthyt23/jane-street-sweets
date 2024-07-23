@@ -12,7 +12,7 @@ type t =
   | Hint
   | Gum
   | Kitkat
-[@@deriving equal, enumerate, compare, sexp_of, hash]
+[@@deriving equal, enumerate, compare, sexp_of, hash, bin_io]
 
 (* game_commodities --> generates the n commodities that will be traded in
    the game based on n players *)
