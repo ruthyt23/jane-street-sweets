@@ -4,21 +4,7 @@ open! Fzf
 module Client = Client
 module Server = Server
 
-module Game_State = struct
-  type t =
-    | In_progress
-    | Game_over of { winner : Player.t option }
-  [@@deriving equal]
-end
-
-type t =
-  { players : Player.t list
-  ; game_state : Game_State.t ref
-  ; commodities_traded : (Commodity.t, int) Hashtbl.t
-  ; open_trades : (int, int * Commodity.t) Hashtbl.t
-  }
-
-let get_player game player_id =
+let get_player (game : Game.t) player_id =
   let players_list = game.players in
   let player_match_opt =
     List.find players_list ~f:(fun player ->
@@ -29,21 +15,23 @@ let get_player game player_id =
   | None -> failwith "No player matches given ID"
 ;;
 
-let generate_player_hands t =
-  List.iter t.players ~f:(fun player ->
+let generate_player_hands (game : Game.t) =
+  List.iter game.players ~f:(fun player ->
     let hand =
       List.init 9 ~f:(fun _ ->
-        let commodities_being_traded = Hashtbl.keys t.commodities_traded in
+        let commodities_being_traded =
+          Hashtbl.keys game.commodities_traded
+        in
         let pool_of_commodites =
           List.filter commodities_being_traded ~f:(fun commodity ->
-            not (Hashtbl.find_exn t.commodities_traded commodity = 0))
+            not (Hashtbl.find_exn game.commodities_traded commodity = 0))
         in
         let chosen_commodity = List.random_element_exn pool_of_commodites in
         let current_num =
-          Hashtbl.find_exn t.commodities_traded chosen_commodity
+          Hashtbl.find_exn game.commodities_traded chosen_commodity
         in
         Hashtbl.set
-          t.commodities_traded
+          game.commodities_traded
           ~key:chosen_commodity
           ~data:(current_num - 1);
         chosen_commodity)
@@ -66,7 +54,12 @@ let change_hand ~(player : Player.t) ~old_commodity ~new_commodity ~num_cards
        (hand_without_old_commodity @ list_of_new_commodity)
 ;;
 
-let handle_trade t (player : Player.t) commodity_to_trade num_cards =
+let handle_trade
+  (game : Game.t)
+  (player : Player.t)
+  commodity_to_trade
+  num_cards
+  =
   let player_hand = player.hand in
   let num_of_commodity =
     List.length
@@ -76,14 +69,14 @@ let handle_trade t (player : Player.t) commodity_to_trade num_cards =
   if num_of_commodity < num_cards || num_cards < 1 || num_cards > 4
   then print_endline "Trade Rejected: Invalid number of cards - must be 1-4."
   else if List.mem
-            (Hashtbl.keys t.open_trades)
+            (Hashtbl.keys game.open_trades)
             num_of_commodity
             ~equal:Int.equal
   then (
     let other_player_id, other_commodity =
-      Hashtbl.find_exn t.open_trades num_of_commodity
+      Hashtbl.find_exn game.open_trades num_of_commodity
     in
-    let other_player = get_player t other_player_id in
+    let other_player = get_player game other_player_id in
     match Player.equal player other_player with
     | true -> print_endline "Trade Rejected: Offer already in the book."
     | false ->
@@ -93,7 +86,7 @@ let handle_trade t (player : Player.t) commodity_to_trade num_cards =
         ~new_commodity:other_commodity
         ~num_cards;
       change_hand
-        ~player:(get_player t other_player_id)
+        ~player:(get_player game other_player_id)
         ~old_commodity:other_commodity
         ~new_commodity:commodity_to_trade
         ~num_cards;
@@ -104,7 +97,7 @@ let handle_trade t (player : Player.t) commodity_to_trade num_cards =
         other_player_id)
   else (
     Hashtbl.add_exn
-      t.open_trades
+      game.open_trades
       ~key:num_cards
       ~data:(player.player_id, commodity_to_trade);
     print_endline "No matching trade found - offer placed on book")
@@ -116,37 +109,17 @@ let win_check (player : Player.t) =
     Commodity.equal first_commodity commodity)
 ;;
 
-let _print_hands t =
-  List.iter t.players ~f:(fun player -> Player.print_hand player)
+let _print_hands (game : Game.t) =
+  List.iter game.players ~f:(fun player -> Player.print_hand player)
 ;;
 
-let create_game num_players =
-  (* Number of players is equal to the number of commodites traded *)
-  let players =
-    List.init num_players ~f:(fun player_id ->
-      Player.{ player_id = player_id + 1; hand = [] })
-  in
-  (* Get all the types of commodities that we are trading and initialize with
-     quantity 9 for each commodity *)
-  let commodities_traded = Hashtbl.create (module Commodity) in
-  let types_of_commodities_traded = Commodity.game_commodities num_players in
-  List.iter types_of_commodities_traded ~f:(fun commodity ->
-    Hashtbl.set commodities_traded ~key:commodity ~data:9);
-  let open_trades = Hashtbl.create (module Int) in
-  { players
-  ; game_state = ref Game_State.In_progress
-  ; commodities_traded
-  ; open_trades
-  }
-;;
-
-let game_over t (player : Player.t) =
-  t.game_state := Game_over { winner = Some player };
+let game_over (game : Game.t) (player : Player.t) =
+  game.game_state := Game_over { winner = Some player };
   printf "GAME OVER! Winner: %d \n" player.player_id
 ;;
 
 let start_game num_players =
-  let game = create_game num_players in
+  let game = Game.create_game num_players in
   generate_player_hands game;
   let player_string_list =
     List.map game.players ~f:(fun player -> Int.to_string player.player_id)
