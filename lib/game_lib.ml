@@ -1,8 +1,6 @@
 open! Async
 open! Core
 open! Fzf
-module Client = Client
-module Server = Server
 
 let get_player (game : Game.t) player_id =
   let players_list = game.players in
