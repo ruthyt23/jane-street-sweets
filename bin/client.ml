@@ -1,0 +1,1 @@
+let () = Command_unix.run Game_lib.Client.command

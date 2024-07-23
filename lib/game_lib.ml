@@ -1,6 +1,8 @@
 open! Async
 open! Core
 open! Fzf
+module Client = Client
+module Server = Server
 
 module Game_State = struct
   type t =
@@ -214,17 +216,10 @@ let start_game num_players =
              | false -> `Finished ()))))
 ;;
 
-let start =
-  Async.Command.async
-    ~summary:"Start a game"
-    [%map_open.Command
-      let num_players =
-        flag "players" (required Command.Param.int) ~doc:"Number of players"
-      in
-      fun () ->
-        if num_players < 3 || num_players > 9
-        then failwith "Invalid number of players: must be 3-9"
-        else start_game num_players]
-;;
+(* let start = Async.Command.async ~summary:"Start a game" [%map_open.Command
+   let num_players = flag "players" (required Command.Param.int) ~doc:"Number
+   of players" in fun () -> if num_players < 3 || num_players > 9 then
+   failwith "Invalid number of players: must be 3-9" else start_game
+   num_players] ;;
 
-let command = Command.group ~summary:"Driver" [ "start", start ]
+   let command = Command.group ~summary:"Driver" [ "start", start ] *)
