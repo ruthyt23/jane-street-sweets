@@ -2,20 +2,11 @@ open! Async
 open! Core
 open! Fzf
 
-module Game_State = struct
-  type t =
-    | In_progress
-    | Game_over of { winner : Player.t option }
-  [@@deriving equal, sexp_of, bin_io]
-end
-
 type t =
   { players : Player.t list
-  ; game_state : Game_State.t ref
-  ; mutable commodities_traded : int Commodity.Map.t
+  ; commodities_traded : (Commodity.t, int) Hashtbl.t
   ; open_trades : (int, int * Commodity.t) Hashtbl.t
   }
-[@@deriving sexp_of, bin_io]
 
 let create_game num_players =
   (* Number of players is equal to the number of commodites traded *)
@@ -30,9 +21,5 @@ let create_game num_players =
   List.iter types_of_commodities_traded ~f:(fun commodity ->
     Hashtbl.set commodities_traded ~key:commodity ~data:9);
   let open_trades = Hashtbl.create (module Int) in
-  { players
-  ; game_state = ref Game_State.In_progress
-  ; commodities_traded
-  ; open_trades
-  }
+  { players; commodities_traded; open_trades }
 ;;

@@ -4,16 +4,14 @@ open! Fzf
 
 module Waiting_room = struct
   module Query = struct
-    type t =
-      { num_players : int
-      ; name : string
-      }
-    [@@deriving sexp_of, bin_io]
+    type t = string [@@deriving sexp_of, bin_io]
   end
 
   module Response = struct
-    type t = Game.t [@@deriving sexp_of, bin_io]
+    type t = int [@@deriving sexp_of, bin_io]
   end
+  (* future extension: add option to pick number of players + multiple
+     games *)
 
   let rpc =
     Rpc.Rpc.create
@@ -26,11 +24,15 @@ end
 
 module Game_data = struct
   module Query = struct
-    type t = unit [@@deriving sexp_of, bin_io]
+    type t = int [@@deriving sexp_of, bin_io]
   end
 
   module Response = struct
-    type t = Game.t [@@deriving sexp_of, bin_io]
+    type t =
+      | Waiting
+      | In_progress of Commodity.t list
+      | Game_over of (Player.t * Commodity.t) list
+    [@@deriving sexp_of, bin_io]
   end
 
   let rpc =
@@ -57,7 +59,6 @@ module Make_trade = struct
       | Trade_successful
       | In_book
       | Trade_rejected of string
-      | Game_over of (Player.t * Commodity.t) list
     [@@deriving sexp_of, bin_io]
   end
 
