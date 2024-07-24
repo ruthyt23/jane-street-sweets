@@ -75,7 +75,16 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
       List.find_exn players_list ~f:(fun player ->
         equal player.player_id query.player_id)
     in
-    Game.handle_trade game player_obj query.commodity query.quantity
+    let%bind result =
+      Game.handle_trade game player_obj query.commodity query.quantity
+    in
+    (match result with
+     | Rpcs.Make_trade.Response.In_book ->
+       print_endline "Order placed in book"
+     | Rpcs.Make_trade.Response.Trade_rejected msg -> print_endline msg
+     | Rpcs.Make_trade.Response.Trade_successful ->
+       print_endline "Order successful");
+    Deferred.return result
 ;;
 
 let implementations =

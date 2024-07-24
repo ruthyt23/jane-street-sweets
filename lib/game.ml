@@ -119,7 +119,7 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
     let other_player = get_player game other_player_id in
     match Player.equal player other_player with
     | true ->
-      print_endline "Trade Rejected: Offer already in the book.";
+      Core.print_endline "Trade Rejected: Offer already in the book.";
       Deferred.return
         (Rpcs.Make_trade.Response.Trade_rejected
            "Trade Rejected: Offer already in the book.")
@@ -134,7 +134,7 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
         ~old_commodity:other_commodity
         ~new_commodity:commodity_to_trade
         ~num_cards;
-      printf
+      Core.printf
         "Trade of %d cards successful between player %d and %d \n"
         num_cards
         player.player_id
