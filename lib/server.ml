@@ -62,6 +62,11 @@ let game_data_handle (_client : unit) (query : Rpcs.Game_data.Query.t) =
 ;;
 
 let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
+  printf
+    "Player %d is trying to trade %d of commodity %s\n"
+    query.player_id
+    query.quantity
+    (Commodity.to_string query.commodity);
   match game_manager.game_opt with
   | None -> failwith "trying to trade with no game"
   | Some game ->

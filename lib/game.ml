@@ -106,23 +106,23 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
   in
   if num_of_commodity < num_cards || num_cards < 1 || num_cards > 4
   then
+    (* print_endline "Trade Rejected: Invalid number of cards - must be
+       1-4."; *)
     Deferred.return
       (Rpcs.Make_trade.Response.Trade_rejected
          "Invalid number of cards - must be 1-4")
-    (* print_endline "Trade Rejected: Invalid number of cards - must be
-       1-4." *)
   else if List.mem (Hashtbl.keys game.open_trades) num_cards ~equal:Int.equal
   then (
     let other_player_id, other_commodity =
-      Hashtbl.find_exn game.open_trades num_of_commodity
+      Hashtbl.find_exn game.open_trades num_cards
     in
     let other_player = get_player game other_player_id in
     match Player.equal player other_player with
     | true ->
+      print_endline "Trade Rejected: Offer already in the book.";
       Deferred.return
         (Rpcs.Make_trade.Response.Trade_rejected
            "Trade Rejected: Offer already in the book.")
-      (* print_endline "Trade Rejected: Offer already in the book." *)
     | false ->
       change_hand
         ~player
@@ -134,9 +134,12 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
         ~old_commodity:other_commodity
         ~new_commodity:commodity_to_trade
         ~num_cards;
-      Deferred.return Rpcs.Make_trade.Response.Trade_successful
-    (* printf "Trade of %d cards successful between player %d and %d \n"
-       num_cards player.player_id other_player_id) *))
+      printf
+        "Trade of %d cards successful between player %d and %d \n"
+        num_cards
+        player.player_id
+        other_player_id;
+      Deferred.return Rpcs.Make_trade.Response.Trade_successful)
   else (
     Hashtbl.add_exn
       game.open_trades
