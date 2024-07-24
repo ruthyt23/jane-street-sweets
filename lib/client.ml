@@ -86,7 +86,7 @@ let pull_game_data ~conn ~player_id =
       else if not (List.equal Commodity.equal !current_hand hand)
       then Core.print_endline "Trade successful!";
       current_hand := hand;
-      make_trades ~conn ~player_id ~hand |> Deferred.value_exn;
+      let%bind () = make_trades ~conn ~player_id ~hand in
       return (`Repeat ())
     | Rpcs.Game_data.Response.Game_over winner_list ->
       game_over winner_list;
@@ -108,10 +108,10 @@ let connect_to_server =
          Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port port)
        in
        let conn = Result.ok_exn conn in
+       Core.printf "Connected to host %s!" host;
        let%bind (player_id : Rpcs.Waiting_room.Response.t) =
          Rpc.Rpc.dispatch_exn Rpcs.Waiting_room.rpc conn join_game_query
        in
-       Core.printf "Connected to host %s!" host;
        pull_game_data ~conn ~player_id)
 ;;
 
