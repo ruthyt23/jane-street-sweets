@@ -1,7 +1,6 @@
 open! Core
 open! Async
 open! Fzf
-open! Import
 
 (* Generates player id for next queued player *)
 module Player_id_manager = struct
