@@ -43,6 +43,7 @@ let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
        the game is the same as the id the user thinks they have*)
     let list_of_player_names = Queue.to_list queue_of_player_names in
     let game = Game.create_game_from_names list_of_player_names in
+    Game.generate_player_hands game;
     game_manager.game_opt <- Some game;
     Deferred.return new_player_id
 ;;

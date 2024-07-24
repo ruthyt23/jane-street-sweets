@@ -147,4 +147,29 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
       ~data:(player.player_id, commodity_to_trade);
     Deferred.return Rpcs.Make_trade.Response.In_book)
 ;;
+
 (* print_endline "No matching trade found - offer placed on book") *)
+
+let generate_player_hands (game : t) =
+  List.iter game.players ~f:(fun player ->
+    let hand =
+      List.init 9 ~f:(fun _ ->
+        let commodities_being_traded =
+          Hashtbl.keys game.commodities_traded
+        in
+        let pool_of_commodites =
+          List.filter commodities_being_traded ~f:(fun commodity ->
+            not (Hashtbl.find_exn game.commodities_traded commodity = 0))
+        in
+        let chosen_commodity = List.random_element_exn pool_of_commodites in
+        let current_num =
+          Hashtbl.find_exn game.commodities_traded chosen_commodity
+        in
+        Hashtbl.set
+          game.commodities_traded
+          ~key:chosen_commodity
+          ~data:(current_num - 1);
+        chosen_commodity)
+    in
+    player.hand <- List.sort ~compare:Commodity.compare hand)
+;;
