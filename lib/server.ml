@@ -6,7 +6,7 @@ open! Fzf
 module Player_id_manager = struct
   type t = int ref
 
-  let create () = ref 0
+  let create () = ref 1
 
   let next_id t =
     let this_id = !t in
