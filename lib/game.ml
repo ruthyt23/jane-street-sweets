@@ -67,3 +67,81 @@ let check_for_wins t =
   List.map winners ~f:(fun winning_player ->
     winning_player, List.hd_exn winning_player.hand)
 ;;
+
+let get_player (game : t) player_id =
+  let players_list = game.players in
+  let player_match_opt =
+    List.find players_list ~f:(fun player ->
+      Int.equal player.player_id player_id)
+  in
+  match player_match_opt with
+  | Some player -> player
+  | None -> failwith "No player matches given ID"
+;;
+
+let change_hand ~(player : Player.t) ~old_commodity ~new_commodity ~num_cards
+  =
+  let list_of_new_commodity =
+    List.init num_cards ~f:(fun _ -> new_commodity)
+  in
+  let hand_without_old_commodity =
+    List.filter player.hand ~f:(fun player_commodity ->
+      not (Commodity.equal player_commodity old_commodity))
+  in
+  player.hand
+  <- List.sort
+       ~compare:Commodity.compare
+       (hand_without_old_commodity @ list_of_new_commodity)
+;;
+
+let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
+  let player_hand = player.hand in
+  let num_of_commodity =
+    List.length
+      (List.filter player_hand ~f:(fun commodity ->
+         Commodity.equal commodity commodity_to_trade))
+  in
+  if num_of_commodity < num_cards || num_cards < 1 || num_cards > 4
+  then
+    Deferred.return
+      (Rpcs.Make_trade.Response.Trade_rejected
+         "Invalid number of cards - must be 1-4")
+    (* print_endline "Trade Rejected: Invalid number of cards - must be
+       1-4." *)
+  else if List.mem
+            (Hashtbl.keys game.open_trades)
+            num_of_commodity
+            ~equal:Int.equal
+  then (
+    let other_player_id, other_commodity =
+      Hashtbl.find_exn game.open_trades num_of_commodity
+    in
+    let other_player = get_player game other_player_id in
+    match Player.equal player other_player with
+    | true ->
+      Deferred.return
+        (Rpcs.Make_trade.Response.Trade_rejected
+           "Trade Rejected: Offer already in the book.")
+      (* print_endline "Trade Rejected: Offer already in the book." *)
+    | false ->
+      change_hand
+        ~player
+        ~old_commodity:commodity_to_trade
+        ~new_commodity:other_commodity
+        ~num_cards;
+      change_hand
+        ~player:(get_player game other_player_id)
+        ~old_commodity:other_commodity
+        ~new_commodity:commodity_to_trade
+        ~num_cards;
+      Deferred.return Rpcs.Make_trade.Response.Trade_successful
+    (* printf "Trade of %d cards successful between player %d and %d \n"
+       num_cards player.player_id other_player_id) *))
+  else (
+    Hashtbl.add_exn
+      game.open_trades
+      ~key:num_cards
+      ~data:(player.player_id, commodity_to_trade);
+    Deferred.return Rpcs.Make_trade.Response.In_book)
+;;
+(* print_endline "No matching trade found - offer placed on book") *)

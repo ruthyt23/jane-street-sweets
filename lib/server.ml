@@ -61,7 +61,15 @@ let game_data_handle (_client : unit) (query : Rpcs.Game_data.Query.t) =
 ;;
 
 let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
-  Deferred.return 1
+  match game_manager.game_opt with
+  | None -> failwith "trying to trade with no game"
+  | Some game ->
+    let players_list = game.players in
+    let player_obj =
+      List.find_exn players_list ~f:(fun player ->
+        equal player.player_id query.player_id)
+    in
+    Game.handle_trade game player_obj query.commodity query.quantity
 ;;
 
 let implementations =
@@ -92,4 +100,8 @@ let start_game =
            ()
        in
        Tcp.Server.close_finished server)
+;;
+
+let command =
+  Command.group ~summary:"Pit Server" [ "start-server", start_game ]
 ;;
