@@ -10,11 +10,6 @@ let print_hand hand =
     printf "%s  " (Commodity.to_string commodity))
 ;;
 
-let successful_trade hand =
-  Core.print_endline "Trade successful!";
-  current_hand := hand
-;;
-
 let handle_trade ~conn ~player_id ~commodity ~num_cards =
   let query =
     { Rpcs.Make_trade.Query.player_id
@@ -86,10 +81,11 @@ let pull_game_data ~conn ~player_id =
     in
     match response with
     | Rpcs.Game_data.Response.In_progress hand ->
-      if not
-           (List.is_empty !current_hand
-            && List.equal Commodity.equal !current_hand hand)
-      then successful_trade hand;
+      if List.is_empty !current_hand
+      then Core.print_endline "\n*** WELCOME TO PIT! ***"
+      else if not (List.equal Commodity.equal !current_hand hand)
+      then Core.print_endline "Trade successful!";
+      current_hand := hand;
       make_trades ~conn ~player_id ~hand |> Deferred.value_exn;
       return (`Repeat ())
     | Rpcs.Game_data.Response.Game_over winner_list ->
@@ -103,18 +99,19 @@ let connect_to_server =
     ~summary:"Join game"
     (let%map_open.Command () = return ()
      and name = flag "-name" (required string) ~doc:"_ name of player"
+     and host = flag "-host" (required string) ~doc:"_ host name"
      and int_port = flag "-port" (required int) ~doc:"_ port to listen on" in
      fun () ->
-       let port = Host_and_port.create ~host:name ~port:int_port in
+       let port = Host_and_port.create ~host ~port:int_port in
        let join_game_query = name in
-       let conn =
+       let%bind conn =
          Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port port)
-         |> Deferred.value_exn
-         |> Result.ok_exn
        in
+       let conn = Result.ok_exn conn in
        let%bind (player_id : Rpcs.Waiting_room.Response.t) =
          Rpc.Rpc.dispatch_exn Rpcs.Waiting_room.rpc conn join_game_query
        in
+       Core.printf "Connected to host %s!" host;
        pull_game_data ~conn ~player_id)
 ;;
 
