@@ -79,7 +79,7 @@ let implementations =
     ~implementations:
       [ Rpc.Rpc.implement Rpcs.Waiting_room.rpc waiting_handle
       ; Rpc.Rpc.implement Rpcs.Game_data.rpc game_data_handle
-        (* Rpc.Rpc.implement Rpcs.Make_trade.rpc make_trade_handle *)
+      ; Rpc.Rpc.implement Rpcs.Make_trade.rpc make_trade_handle
       ]
 ;;
 

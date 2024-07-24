@@ -111,10 +111,7 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
          "Invalid number of cards - must be 1-4")
     (* print_endline "Trade Rejected: Invalid number of cards - must be
        1-4." *)
-  else if List.mem
-            (Hashtbl.keys game.open_trades)
-            num_of_commodity
-            ~equal:Int.equal
+  else if List.mem (Hashtbl.keys game.open_trades) num_cards ~equal:Int.equal
   then (
     let other_player_id, other_commodity =
       Hashtbl.find_exn game.open_trades num_of_commodity
