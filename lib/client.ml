@@ -48,7 +48,8 @@ let make_trades ~conn ~player_id ~hand =
   match commodity_opt |> ok_exn with
   | None -> return ()
   | Some commodity ->
-    print_endline "How many would you like to trade? (1-4)";
+    printf "Commodity: %s\n" commodity;
+    print_endline "How many would you like to trade? (1-4) ";
     let selection_for_numcards = Pick_from.inputs num_cards_string_list in
     let%bind num_cards_opt =
       pick_one selection_for_numcards ~prompt_at_top:() ~height:7
@@ -56,6 +57,7 @@ let make_trades ~conn ~player_id ~hand =
     (match num_cards_opt |> ok_exn with
      | None -> return ()
      | Some cards ->
+       printf "Number of cards: %s\n" cards;
        let num_cards = Int.of_string cards in
        handle_trade
          ~conn
