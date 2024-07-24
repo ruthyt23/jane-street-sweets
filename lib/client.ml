@@ -107,11 +107,11 @@ let connect_to_server =
        let%bind conn =
          Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port port)
        in
-       Core.printf "Connected to host %s!" host;
        let conn = Result.ok_exn conn in
        let%bind (player_id : Rpcs.Waiting_room.Response.t) =
          Rpc.Rpc.dispatch_exn Rpcs.Waiting_room.rpc conn join_game_query
        in
+       Core.printf "Connected to host %s!" host;
        pull_game_data ~conn ~player_id)
 ;;
 
