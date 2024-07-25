@@ -131,7 +131,11 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
     query.player_id
     query.quantity
     (Commodity.to_string query.commodity);
-  match game_manager.game_opt with
+  let game_opt =
+    Queue.find game_manager.games_that_have_started ~f:(fun game ->
+      equal game.game_id query.game_id)
+  in
+  match game_opt with
   | None -> failwith "trying to trade with no game"
   | Some game ->
     let players_list = game.players in
