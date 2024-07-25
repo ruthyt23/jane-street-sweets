@@ -64,6 +64,8 @@ let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
   Game.add_player_to_game game_to_join player_obj;
   if equal (List.length game_to_join.players) query.num_players
   then (
+    Game.start_game game_to_join;
+    printf "Game %d has started\n" response_game_id;
     Queue.enqueue game_manager.games_that_have_started game_to_join;
     Hashtbl.set
       game_manager.games_waiting_to_start
@@ -71,7 +73,7 @@ let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
       ~data:
         (Game.create_empty_game (Game_id_manager.next_id game_id_manager)));
   printf
-    "%s has joined game %d and their player_id is %d"
+    "%s has joined game %d and their player_id is %d\n"
     query.name
     response_game_id
     response_player_id;
@@ -105,6 +107,8 @@ let player_game_data_handle
     Queue.find game_manager.games_that_have_started ~f:(fun game ->
       equal game.game_id query.game_id)
   in
+  (* print_s [%message (game_manager.games_that_have_started : Game.t
+     Queue.t)]; *)
   match game_opt with
   | None ->
     return
@@ -119,6 +123,7 @@ let player_game_data_handle
         commodity, amount_to_trade)
     in
     let player_hand = Game.get_hand_for_player game query.player_id in
+    (* print_s [%message (player_hand : Commodity.t list)]; *)
     return
       { Rpcs.Player_game_data.Response.current_book = response_book
       ; player_hand
@@ -171,6 +176,7 @@ let start_game =
     ~summary:"Play"
     (let%map_open.Command () = return ()
      and port = flag "-port" (required int) ~doc:"_ port to listen\n   on" in
+     print_endline "About to start server...";
      fun () ->
        let%bind server =
          Rpc.Connection.serve

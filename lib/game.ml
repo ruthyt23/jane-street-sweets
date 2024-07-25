@@ -9,6 +9,7 @@ type t =
   ; mutable game_full : bool
   ; game_id : int
   }
+[@@deriving sexp_of]
 
 (* let create_game_from_names (list_of_player_names : String.t list) = let
    num_players = List.length list_of_player_names in let players = List.init
