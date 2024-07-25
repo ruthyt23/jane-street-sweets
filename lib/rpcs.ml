@@ -83,6 +83,7 @@ module Make_trade = struct
   module Query = struct
     type t =
       { player_id : int
+      ; game_id : int
       ; commodity : Commodity.t
       ; quantity : int
       }

@@ -3,10 +3,11 @@ open! Core
 open! Fzf
 
 type t =
-  { players : Player.t list
+  { mutable players : Player.t list
   ; commodities_traded : (Commodity.t, int) Hashtbl.t
   ; open_trades : (int, int * Commodity.t) Hashtbl.t
   ; mutable game_full : bool
+  ; game_id : int
   }
 
 (* let create_game_from_names (list_of_player_names : String.t list) = let
@@ -163,11 +164,12 @@ let generate_player_hands (game : t) =
     player.hand <- List.sort ~compare:Commodity.compare hand)
 ;;
 
-let create_empty_game () =
+let create_empty_game game_id =
   { players = []
   ; commodities_traded = Hashtbl.create (module Commodity)
   ; open_trades = Hashtbl.create (module Int)
   ; game_full = false
+  ; game_id
   }
 ;;
 
@@ -178,4 +180,9 @@ let start_game t =
     Hashtbl.set t.commodities_traded ~key:commodity ~data:9);
   t.game_full <- true;
   generate_player_hands t
+;;
+
+let add_player_to_game t player =
+  let new_players_list = List.append t.players [ player ] in
+  t.players <- new_players_list
 ;;
