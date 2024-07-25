@@ -4,7 +4,11 @@ open! Fzf
 
 module Waiting_room = struct
   module Query = struct
-    type t = string [@@deriving sexp_of, bin_io]
+    type t =
+      { name : string
+      ; num_players : int
+      }
+    [@@deriving sexp_of, bin_io]
   end
 
   module Response = struct

@@ -104,8 +104,13 @@ let pull_player_data ~game_id ~player_id =
     then (
       book := current_book;
       print_endline "*** UPDATED BOOK ***";
-      print_s [%sexp (!book : Commodity.t * int list)]);
-    print_endline "*** UPDATED BOOK ***";
+      print_s [%sexp (!book : (Commodity.t * int) list)]);
+    if List.length player_hand = List.length !hand
+       && List.equal Commodity.equal player_hand !hand
+    then (
+      hand := player_hand;
+      print_endline "*** UPDATED HAND ***";
+      print_s [%sexp (!hand : Commodity.t list)]);
     return (`Repeat ()))
 ;;
 
