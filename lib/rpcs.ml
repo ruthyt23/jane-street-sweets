@@ -8,7 +8,11 @@ module Waiting_room = struct
   end
 
   module Response = struct
-    type t = int [@@deriving sexp_of, bin_io]
+    type t =
+      { game_id : int
+      ; player_id : int
+      }
+    [@@deriving sexp_of, bin_io]
   end
   (* future extension: add option to pick number of players + multiple
      games *)
@@ -22,22 +26,49 @@ module Waiting_room = struct
   ;;
 end
 
-module Game_data = struct
+module Game_state = struct
   module Query = struct
-    type t = int [@@deriving sexp_of, bin_io]
+    type t = int [@@deriving sexp_of, bin_io] (* game id *)
   end
 
   module Response = struct
     type t =
       | Waiting
-      | In_progress of Commodity.t list
+      | In_progress
       | Game_over of (Player.t * Commodity.t) list
     [@@deriving sexp_of, bin_io]
   end
 
   let rpc =
     Rpc.Rpc.create
-      ~name:"game-data"
+      ~name:"game-state"
+      ~version:0
+      ~bin_query:Query.bin_t
+      ~bin_response:Response.bin_t
+  ;;
+end
+
+module Player_game_data = struct
+  (* game id, player id*)
+  module Query = struct
+    type t =
+      { game_id : int
+      ; player_id : int
+      }
+    [@@deriving sexp_of, bin_io]
+  end
+
+  module Response = struct
+    type t =
+      { current_book : Commodity.t * int list
+      ; player_hand : Commodity.t list
+      }
+    [@@deriving sexp_of, bin_io]
+  end
+
+  let rpc =
+    Rpc.Rpc.create
+      ~name:"player-game-data"
       ~version:0
       ~bin_query:Query.bin_t
       ~bin_response:Response.bin_t
