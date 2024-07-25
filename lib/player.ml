@@ -11,6 +11,10 @@ type t =
 
 (* let update_hand = 0 ;; *)
 
+let create_player player_id player_name =
+  { player_id; player_name; hand = [] }
+;;
+
 let print_hand t =
   printf "Hand for player %d: " t.player_id;
   List.iter t.hand ~f:(fun commodity ->

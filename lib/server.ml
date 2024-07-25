@@ -16,9 +16,29 @@ module Player_id_manager = struct
 end
 
 module Game_manager = struct
-  type t = { mutable game_opt : Game.t option }
+  type t =
+    { games_waiting_to_start : (int, Game.t) Hashtbl.t
+    ; games_that_have_started : Game.t list
+    }
 
-  let create () = { game_opt = None }
+  let create () =
+    let games_waiting_to_start = Hashtbl.create (module Int) in 
+    List.init 6 ~f:(fun num_players -> 
+    Hashtbl.set games_waiting_to_start ~key:num_players ~data:(Game.create_empty_game ())
+      
+      )
+
+
+
+    let hashtbl_for_queueing = Hashtbl.create (module Int) in
+    { games_waiting_to_start = hashtbl_for_queueing
+    ; games_that_have_started = []
+    }
+  ;;
+
+  (* To make sure our memeory doesn't grow unbounded, maybe add a feature to
+     cleanup games that have already finished *)
+  let clean_up () = 0
 end
 
 let queue_of_player_names = Queue.create ()
@@ -26,6 +46,8 @@ let player_id_manager = Player_id_manager.create ()
 let game_manager = Game_manager.create ()
 
 let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
+
+
   Queue.enqueue queue_of_player_names query;
   let new_player_id = Player_id_manager.next_id player_id_manager in
   printf
@@ -48,17 +70,17 @@ let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
     Deferred.return new_player_id
 ;;
 
-let game_data_handle (_client : unit) (query : Rpcs.Game_data.Query.t) =
+let game_data_handle (_client : unit) (query : Rpcs.Game_state.Query.t) =
   (* Wait until three players, then send in the game_data *)
   match game_manager.game_opt with
-  | None -> return Rpcs.Game_data.Response.Waiting
+  | None -> return Rpcs.Game_state.Response.Waiting
   | Some game ->
     let winning_players = Game.check_for_wins game in
     (match Int.(List.length winning_players >= 1) with
-     | true -> return (Rpcs.Game_data.Response.Game_over winning_players)
+     | true -> return (Rpcs.Game_state.Response.Game_over winning_players)
      | false ->
-       let player_hand = Game.get_hand_for_player game query in
-       return (Rpcs.Game_data.Response.In_progress player_hand))
+       (* let player_hand = Game.get_hand_for_player game query in *)
+       return Rpcs.Game_state.Response.In_progress)
 ;;
 
 let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
