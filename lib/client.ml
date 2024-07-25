@@ -18,6 +18,7 @@ let print_hand hand =
 let handle_trade ~commodity ~num_cards =
   let query =
     { Rpcs.Make_trade.Query.player_id = !player_id
+    ; Rpcs.Make_trade.Query.game_id = !game_id
     ; Rpcs.Make_trade.Query.commodity
     ; Rpcs.Make_trade.Query.quantity = num_cards
     }
@@ -128,26 +129,38 @@ let connect_to_server =
     ~summary:"Join game"
     (let%map_open.Command () = return ()
      and name = flag "-name" (required string) ~doc:"_ name of player"
+     and num_players =
+       flag
+         "-players"
+         (required int)
+         ~doc:"_ game size the user would like to play in"
      and host = flag "-host" (required string) ~doc:"_ host name"
      and int_port = flag "-port" (required int) ~doc:"_ port to listen on" in
      fun () ->
-       let port = Host_and_port.create ~host ~port:int_port in
-       let join_game_query = name in
-       let%bind conn_bind =
-         Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port port)
-       in
-       connection := Some (Result.ok_exn conn_bind);
-       let%bind (initial_game_data : Rpcs.Waiting_room.Response.t) =
-         Rpc.Rpc.dispatch_exn Rpcs.Waiting_room.rpc conn join_game_query
-       in
-       game_id := initial_game_data.game_id;
-       player_id := initial_game_data.player_id;
-       printf
-         "Connected to host %s!\nGame ID: %d\nPlayer ID: %d"
-         host
-         !game_id
-         !player_id;
-       pull_game_state)
+       if num_players < 3 || num_players > 9
+       then failwith "Invalid number of players: must be between 3-9."
+       else (
+         let port = Host_and_port.create ~host ~port:int_port in
+         let join_game_query =
+           { Rpcs.Waiting_room.Query.name
+           ; Rpcs.Waiting_room.Query.num_players
+           }
+         in
+         let%bind conn_bind =
+           Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port port)
+         in
+         connection := Some (Result.ok_exn conn_bind);
+         let%bind (initial_game_data : Rpcs.Waiting_room.Response.t) =
+           Rpc.Rpc.dispatch_exn Rpcs.Waiting_room.rpc conn join_game_query
+         in
+         game_id := initial_game_data.game_id;
+         player_id := initial_game_data.player_id;
+         printf
+           "Connected to host %s!\nGame ID: %d\nPlayer ID: %d"
+           host
+           !game_id
+           !player_id;
+         pull_game_state))
 ;;
 
 let command =
