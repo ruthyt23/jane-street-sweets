@@ -48,10 +48,23 @@ let change_hand ~(player : Player.t) ~old_commodity ~new_commodity ~num_cards
     List.filter player.hand ~f:(fun player_commodity ->
       not (Commodity.equal player_commodity old_commodity))
   in
+  let correct_amount_of_old_commodity =
+    9 - List.length (list_of_new_commodity @ hand_without_old_commodity)
+  in
+  let correct_old_commodity_list =
+    List.init correct_amount_of_old_commodity ~f:(fun _ -> old_commodity)
+  in
+  print_s
+    [%message
+      ""
+        (hand_without_old_commodity : Commodity.t list)
+        (correct_old_commodity_list : Commodity.t list)];
   player.hand
   <- List.sort
        ~compare:Commodity.compare
-       (hand_without_old_commodity @ list_of_new_commodity)
+       (hand_without_old_commodity
+        @ list_of_new_commodity
+        @ correct_old_commodity_list)
 ;;
 
 let handle_trade
