@@ -152,8 +152,14 @@ let connect_to_server =
            ; Rpcs.Waiting_room.Query.num_players
            }
          in
+         let time = Time_ns.Span.create ~min:2 () in
+         let timeout =
+           Rpc.Connection.Heartbeat_config.create ~timeout:time ()
+         in
          let%bind conn_bind =
-           Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port port)
+           Rpc.Connection.client
+             (Tcp.Where_to_connect.of_host_and_port port)
+             ~heartbeat_config:timeout
          in
          let conn = Result.ok_exn conn_bind in
          let%bind (initial_game_data : Rpcs.Waiting_room.Response.t) =
