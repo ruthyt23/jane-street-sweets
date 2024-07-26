@@ -112,7 +112,10 @@ let player_game_data_handle
   match game_opt with
   | None ->
     return
-      { Rpcs.Player_game_data.Response.current_book = []; player_hand = [] }
+      { Rpcs.Player_game_data.Response.current_book = []
+      ; player_hand = []
+      ; winner_list = None
+      }
   | Some game ->
     let list_of_trade_amounts = Hashtbl.keys game.open_trades in
     let response_book =
@@ -123,10 +126,16 @@ let player_game_data_handle
         commodity, amount_to_trade)
     in
     let player_hand = Game.get_hand_for_player game query.player_id in
+    let winning_players =
+      match List.length (Game.check_for_wins game) >= 1 with
+      | true -> Some (Game.check_for_wins game)
+      | false -> None
+    in
     (* print_s [%message (player_hand : Commodity.t list)]; *)
     return
       { Rpcs.Player_game_data.Response.current_book = response_book
       ; player_hand
+      ; winner_list = winning_players
       }
 ;;
 
@@ -160,14 +169,18 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
     Deferred.return result
 ;;
 
+Core.Result.ok
+
 let implementations =
   Rpc.Implementations.create_exn
     ~on_unknown_rpc:`Close_connection
     ~implementations:
-      [ Rpc.Rpc.implement Rpcs.Waiting_room.rpc waiting_handle
-      ; Rpc.Rpc.implement Rpcs.Game_state.rpc game_data_handle
-      ; Rpc.Rpc.implement Rpcs.Player_game_data.rpc player_game_data_handle
-      ; Rpc.Rpc.implement Rpcs.Make_trade.rpc make_trade_handle
+      [ Rpc.Pipe_rpc.implement Rpcs.Waiting_room.rpc waiting_handle
+      ; Rpc.Pipe_rpc.implement Rpcs.Game_state.rpc game_data_handle
+      ; Rpc.Pipe_rpc.implement
+          Rpcs.Player_game_data.rpc
+          player_game_data_handle
+      ; Rpc.Pipe_rpc.implement Rpcs.Make_trade.rpc make_trade_handle
       ]
 ;;
 
