@@ -66,6 +66,7 @@ module Player_game_data = struct
     type t =
       { current_book : (Commodity.t * int) list
       ; player_hand : Commodity.t list
+      ; winner_list : (Player.t * Commodity.t) list option
       }
     [@@deriving sexp_of, bin_io]
   end
