@@ -22,7 +22,7 @@ module Waiting_room = struct
      games *)
 
   let rpc =
-    Rpc.Pipe_rpc.create
+    Rpc.Rpc.create
       ~name:"waiting-room"
       ~version:0
       ~bin_query:Query.bin_t
@@ -44,7 +44,7 @@ module Game_state = struct
   end
 
   let rpc =
-    Rpc.Pipe_rpc.create
+    Rpc.Rpc.create
       ~name:"game-state"
       ~version:0
       ~bin_query:Query.bin_t
@@ -100,7 +100,7 @@ module Make_trade = struct
   end
 
   let rpc =
-    Rpc.Pipe_rpc.create
+    Rpc.Rpc.create
       ~name:"make-trade"
       ~version:0
       ~bin_query:Query.bin_t
