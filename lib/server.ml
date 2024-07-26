@@ -27,10 +27,15 @@ module Game_id_manager = struct
   ;;
 end
 
+module Update = struct
+  type t = Rpcs.Player_game_data.Response.t
+end
+
 module Game_manager = struct
   type t =
     { games_waiting_to_start : (int, Game.t) Hashtbl.t
     ; games_that_have_started : Game.t Queue.t
+    ; mutable game_listeners : (Game.t * (Update.t -> unit Deferred.t)) list
     }
 
   let create () =
@@ -42,7 +47,10 @@ module Game_manager = struct
           ~key:(3 + num_players)
           ~data:(Game.create_empty_game num_players))
     in
-    { games_waiting_to_start; games_that_have_started = Queue.create () }
+    { games_waiting_to_start
+    ; games_that_have_started = Queue.create ()
+    ; game_listeners = []
+    }
   ;;
 
   (* To make sure our memeory doesn't grow unbounded, maybe add a feature to
@@ -107,37 +115,34 @@ let player_game_data_handle
     Queue.find game_manager.games_that_have_started ~f:(fun game ->
       equal game.game_id query.game_id)
   in
-  (* print_s [%message (game_manager.games_that_have_started : Game.t
-     Queue.t)]; *)
   match game_opt with
-  | None ->
-    return
-      { Rpcs.Player_game_data.Response.current_book = []
-      ; player_hand = []
-      ; winner_list = None
-      }
+  | None -> return (Error ())
   | Some game ->
-    let list_of_trade_amounts = Hashtbl.keys game.open_trades in
-    let response_book =
-      List.map list_of_trade_amounts ~f:(fun amount_to_trade ->
-        let _, commodity =
-          Hashtbl.find_exn game.open_trades amount_to_trade
-        in
-        commodity, amount_to_trade)
-    in
-    let player_hand = Game.get_hand_for_player game query.player_id in
-    let winning_players =
-      match List.length (Game.check_for_wins game) >= 1 with
-      | true -> Some (Game.check_for_wins game)
-      | false -> None
-    in
-    (* print_s [%message (player_hand : Commodity.t list)]; *)
     return
-      { Rpcs.Player_game_data.Response.current_book = response_book
-      ; player_hand
-      ; winner_list = winning_players
-      }
+      (Ok
+         (Async_kernel.Pipe.create_reader
+            ~close_on_exception:true
+            (fun writer ->
+               (* ********************************* *)
+               (* these anonymous functions defined in this have access to writer *)
+               add_to_game_listeners (fun update -> Pipe.write update))))
 ;;
+
+(* ********************************* *)
+
+(* then whenever we change the game state, go through all the game listeners
+   and then call the functions *)
+
+(* let list_of_trade_amounts = Hashtbl.keys game.open_trades in let
+   response_book = List.map list_of_trade_amounts ~f:(fun amount_to_trade ->
+   let _, commodity = Hashtbl.find_exn game.open_trades amount_to_trade in
+   commodity, amount_to_trade) in let player_hand = Game.get_hand_for_player
+   game query.player_id in let winning_players = match List.length
+   (Game.check_for_wins game) >= 1 with | true -> Some (Game.check_for_wins
+   game) | false -> None in (* print_s [%message (player_hand : Commodity.t
+   list)]; *) let update = { Rpcs.Player_game_data.Response.current_book =
+   response_book ; player_hand ; winner_list = winning_players } in *)
+(* Pipe.write writer update))) *)
 
 let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
   printf
@@ -175,12 +180,12 @@ let implementations =
   Rpc.Implementations.create_exn
     ~on_unknown_rpc:`Close_connection
     ~implementations:
-      [ Rpc.Pipe_rpc.implement Rpcs.Waiting_room.rpc waiting_handle
-      ; Rpc.Pipe_rpc.implement Rpcs.Game_state.rpc game_data_handle
+      [ Rpc.Rpc.implement Rpcs.Waiting_room.rpc waiting_handle
+      ; Rpc.Rpc.implement Rpcs.Game_state.rpc game_data_handle
       ; Rpc.Pipe_rpc.implement
           Rpcs.Player_game_data.rpc
           player_game_data_handle
-      ; Rpc.Pipe_rpc.implement Rpcs.Make_trade.rpc make_trade_handle
+      ; Rpc.Rpc.implement Rpcs.Make_trade.rpc make_trade_handle
       ]
 ;;
 

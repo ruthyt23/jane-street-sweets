@@ -71,12 +71,18 @@ module Player_game_data = struct
     [@@deriving sexp_of, bin_io]
   end
 
+  module Error = struct
+    type t = unit [@@deriving sexp_of, bin_io]
+  end
+
   let rpc =
     Rpc.Pipe_rpc.create
       ~name:"player-game-data"
       ~version:0
       ~bin_query:Query.bin_t
       ~bin_response:Response.bin_t
+      ~bin_error:Error.bin_t
+      ()
   ;;
 end
 
