@@ -64,22 +64,8 @@ let game_over winner_list =
 (*else if not (List.equal Commodity.equal !current_hand hand) then
   Core.print_endline "Trade successful!"; current_hand := hand;*)
 
-let pull_game_state ~conn =
-  Deferred.repeat_until_finished () (fun _ ->
-    let (query : Rpcs.Game_state.Query.t) = !game_id in
-    let%bind (response : Rpcs.Game_state.Response.t) =
-      Rpc.Rpc.dispatch_exn Rpcs.Game_state.rpc conn query
-    in
-    match response with
-    | Rpcs.Game_state.Response.In_progress ->
-      if List.is_empty !hand
-      then Core.print_endline "\n*** WELCOME TO PIT! ***";
-      let%bind () = make_trades ~conn in
-      return (`Repeat ())
-    | Rpcs.Game_state.Response.Game_over winner_list ->
-      game_over winner_list;
-      return (`Finished ())
-    | Rpcs.Game_state.Response.Waiting -> return (`Repeat ()))
+let send_trades ~conn =
+  Deferred.repeat_until_finished () (fun _ -> make_trades ~conn)
 ;;
 
 let pull_player_data ~conn ~game_id ~player_id =
@@ -172,7 +158,7 @@ let connect_to_server =
            host
            !game_id
            !player_id;
-         pull_game_state ~conn))
+         send_trades ~conn))
 ;;
 
 let command =
