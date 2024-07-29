@@ -22,8 +22,9 @@ let handle_trade ~conn ~commodity ~num_cards =
     ; Rpcs.Make_trade.Query.quantity = num_cards
     }
   in
+  let%bind conn_bind = conn () in
   let%bind (response : Rpcs.Make_trade.Response.t) =
-    Rpc.Rpc.dispatch_exn Rpcs.Make_trade.rpc conn query
+    Rpc.Rpc.dispatch_exn Rpcs.Make_trade.rpc conn_bind query
   in
   (match response with
    | Trade_successful -> ()
@@ -61,14 +62,12 @@ let game_over winner_list =
       [%string "%{player.player_name#String} with %{commodity#Commodity}"])
 ;;
 
-(*else if not (List.equal Commodity.equal !current_hand hand) then
-  Core.print_endline "Trade successful!"; current_hand := hand;*)
-
 let pull_game_state ~conn =
   Deferred.repeat_until_finished () (fun _ ->
     let (query : Rpcs.Game_state.Query.t) = !game_id in
+    let%bind conn_bind = conn () in
     let%bind (response : Rpcs.Game_state.Response.t) =
-      Rpc.Rpc.dispatch_exn Rpcs.Game_state.rpc conn query
+      Rpc.Rpc.dispatch_exn Rpcs.Game_state.rpc conn_bind query
     in
     match response with
     | Rpcs.Game_state.Response.In_progress ->
@@ -79,7 +78,10 @@ let pull_game_state ~conn =
     | Rpcs.Game_state.Response.Game_over winner_list ->
       game_over winner_list;
       return (`Finished ())
-    | Rpcs.Game_state.Response.Waiting -> return (`Repeat ()))
+    | Rpcs.Game_state.Response.Waiting ->
+      let span = Time_float.Span.of_ms 250.0 in
+      let%bind () = Async.after span in
+      return (`Repeat ()))
 ;;
 
 let pull_player_data ~conn ~game_id ~player_id =
@@ -93,9 +95,10 @@ let pull_player_data ~conn ~game_id ~player_id =
     conn
     query
     ~f:(fun response ->
+      print_endline "entered function";
       match response with
       | Closed _ ->
-        ();
+        print_endline "pipe closed.";
         Rpc.Pipe_rpc.Pipe_response.Wait (return ())
       | Update message ->
         let ( (current_book : (Commodity.t * int) list)
@@ -104,6 +107,8 @@ let pull_player_data ~conn ~game_id ~player_id =
           =
           message.current_book, message.player_hand, message.winner_list
         in
+        print_endline "message received: ";
+        print_s [%sexp (!hand : Commodity.t list)];
         (match winner_list with
          | Some winner_list ->
            game_over winner_list;
@@ -137,13 +142,14 @@ let book_data =
      and game = flag "-game" (required int) ~doc:"_ name of player"
      and player = flag "-player" (required int) ~doc:"_ name of player" in
      fun () ->
-       let port = Host_and_port.create ~host ~port:int_port in
+       let host_and_port = Host_and_port.create ~host ~port:int_port in
        let%bind conn_bind =
-         Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port port)
+         Rpc.Connection.client
+           (Tcp.Where_to_connect.of_host_and_port host_and_port)
        in
        let conn = Result.ok_exn conn_bind in
        let%bind _ = pull_player_data ~conn ~game_id:game ~player_id:player in
-       return ())
+       Deferred.never ())
 ;;
 
 let connect_to_server =
@@ -162,24 +168,23 @@ let connect_to_server =
        if num_players < 3 || num_players > 9
        then failwith "Invalid number of players: must be between 3-9."
        else (
-         let port = Host_and_port.create ~host ~port:int_port in
+         let host_and_port = Host_and_port.create ~host ~port:int_port in
          let join_game_query =
            { Rpcs.Waiting_room.Query.name
            ; Rpcs.Waiting_room.Query.num_players
            }
          in
-         let time = Time_ns.Span.create ~min:2 () in
-         let timeout =
-           Rpc.Connection.Heartbeat_config.create ~timeout:time ()
-         in
-         let%bind conn_bind =
+         let conn () =
            Rpc.Connection.client
-             (Tcp.Where_to_connect.of_host_and_port port)
-             ~heartbeat_config:timeout
+             (Tcp.Where_to_connect.of_host_and_port host_and_port)
+           >>| Result.ok_exn
          in
-         let conn = Result.ok_exn conn_bind in
+         let%bind conn_bind = conn () in
          let%bind (initial_game_data : Rpcs.Waiting_room.Response.t) =
-           Rpc.Rpc.dispatch_exn Rpcs.Waiting_room.rpc conn join_game_query
+           Rpc.Rpc.dispatch_exn
+             Rpcs.Waiting_room.rpc
+             conn_bind
+             join_game_query
          in
          game_id := initial_game_data.game_id;
          player_id := initial_game_data.player_id;
