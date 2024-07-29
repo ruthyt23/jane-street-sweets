@@ -99,7 +99,8 @@ module Make_trade = struct
 
   module Response = struct
     type t =
-      | Trade_successful
+      (* Trade happened between player1 and player2 *)
+      | Trade_successful of (int * int)
       | In_book
       | Trade_rejected of string
     [@@deriving sexp_of, bin_io]

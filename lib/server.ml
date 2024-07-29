@@ -103,6 +103,25 @@ let game_data_handle (_client : unit) (query : Rpcs.Game_state.Query.t) =
   | None -> Deferred.return Rpcs.Game_state.Response.Waiting
 ;;
 
+let get_update_for_player (game : Game.t) player_id =
+  let list_of_trade_amounts = Hashtbl.keys game.open_trades in
+  let response_book =
+    List.map list_of_trade_amounts ~f:(fun amount_to_trade ->
+      let _, commodity = Hashtbl.find_exn game.open_trades amount_to_trade in
+      commodity, amount_to_trade)
+  in
+  let player_hand = Game.get_hand_for_player game player_id in
+  let winning_players =
+    match List.length (Game.check_for_wins game) >= 1 with
+    | true -> Some (Game.check_for_wins game)
+    | false -> None
+  in
+  { Rpcs.Player_game_data.Response.current_book = response_book
+  ; player_hand
+  ; winner_list = winning_players
+  }
+;;
+
 let player_game_data_handle
   (_client : unit)
   (query : Rpcs.Player_game_data.Query.t)
@@ -114,6 +133,7 @@ let player_game_data_handle
   match game_opt with
   | None -> return (Error ())
   | Some game ->
+    print_endline "Pipe created";
     return
       (Ok
          (Async_kernel.Pipe.create_reader
@@ -121,9 +141,13 @@ let player_game_data_handle
             (fun writer ->
                (* ********************************* *)
                (* these anonymous functions defined in this have access to writer *)
-               return
-                 (Game.add_to_game_listeners game (fun update ->
-                    Pipe.write writer update)))))
+               let immediate_update =
+                 get_update_for_player game query.player_id
+               in
+               let%bind () = Pipe.write writer immediate_update in
+               Game.add_to_game_listeners game query.player_id (fun update ->
+                 Pipe.write writer update);
+               Deferred.never ())))
 ;;
 
 (* ********************************* *)
@@ -165,13 +189,34 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
     in
     (match result with
      | Rpcs.Make_trade.Response.In_book ->
-       print_endline "Order placed in book"
-     | Rpcs.Make_trade.Response.Trade_rejected msg -> print_endline msg
-     | Rpcs.Make_trade.Response.Trade_successful ->
-       print_endline "Order successful");
-    (* iterating through game_listeners will write to the pipe *)
-    List.iter game.game_listeners ~f:(fun _ -> ());
-    Deferred.return result
+       print_endline "Order placed in book";
+       Deferred.return result
+     | Rpcs.Make_trade.Response.Trade_rejected msg ->
+       print_endline msg;
+       Deferred.return result
+     | Rpcs.Make_trade.Response.Trade_successful players_involved ->
+       (* print_endline "Order successful"); *)
+       (* iterating through game_listeners will write to the pipe *)
+       let player_id_1, player_id_2 = players_involved in
+       let relevant_game_listeners =
+         List.filter game.game_listeners ~f:(fun player_listener_pair ->
+           let curr_player_id, _ = player_listener_pair in
+           equal curr_player_id player_id_1
+           || equal curr_player_id player_id_2)
+       in
+       let%bind () =
+         Deferred.List.iter
+           ~how:`Parallel
+           relevant_game_listeners
+           ~f:(fun player_listener_pair ->
+             let player, listener = player_listener_pair in
+             let player_update = get_update_for_player game player in
+             listener player_update)
+       in
+       print_endline "Order Successful";
+       Deferred.return result)
+(* let%bind () = Deferred.List.iter ~how:`Parallel game.game_li ~f:(fun
+   listener -> listener update) *)
 ;;
 
 Core.Result.ok

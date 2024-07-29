@@ -9,7 +9,8 @@ type t =
   ; mutable game_full : bool
   ; game_id : int
   ; mutable game_listeners :
-      (Rpcs.Player_game_data.Response.t -> unit Deferred.t) list
+      (int * (Rpcs.Player_game_data.Response.t -> unit Deferred.t)) list
+  (* player_id, listener for player *)
   }
 [@@deriving sexp_of]
 
@@ -145,7 +146,9 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
         num_cards
         player.player_id
         other_player_id;
-      Deferred.return Rpcs.Make_trade.Response.Trade_successful)
+      Deferred.return
+        (Rpcs.Make_trade.Response.Trade_successful
+           (player.player_id, other_player_id)))
   else (
     Hashtbl.add_exn
       game.open_trades
@@ -190,8 +193,17 @@ let create_empty_game game_id =
   }
 ;;
 
-let add_to_game_listeners game listener =
-  let new_game_listeners = List.append game.game_listeners [ listener ] in
+let add_to_game_listeners game player_id listener =
+  (* We need to filter out the current listener for the player if it
+     exists *)
+  let old_game_listeners =
+    List.filter game.game_listeners ~f:(fun player_listener_pair ->
+      let curr_player_id, _ = player_listener_pair in
+      not (equal curr_player_id player_id))
+  in
+  let new_game_listeners =
+    List.append old_game_listeners [ player_id, listener ]
+  in
   game.game_listeners <- new_game_listeners
 ;;
 
