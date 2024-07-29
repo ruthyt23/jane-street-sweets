@@ -27,7 +27,7 @@ let handle_trade ~conn ~commodity ~num_cards =
     Rpc.Rpc.dispatch_exn Rpcs.Make_trade.rpc conn_bind query
   in
   (match response with
-   | Trade_successful -> ()
+   | Trade_successful _ -> ()
    | In_book ->
      Core.print_endline "No matching trade found - offer placed on book"
    | Trade_rejected message -> Core.print_endline message);
