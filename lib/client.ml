@@ -83,34 +83,49 @@ let pull_game_state ~conn =
 ;;
 
 let pull_player_data ~conn ~game_id ~player_id =
-  Deferred.repeat_until_finished () (fun _ ->
-    let (query : Rpcs.Player_game_data.Query.t) =
-      { Rpcs.Player_game_data.Query.game_id
-      ; Rpcs.Player_game_data.Query.player_id
-      }
-    in
-    let%bind (response : Rpcs.Player_game_data.Response.t) =
-      Rpc.Rpc.dispatch_exn Rpcs.Player_game_data.rpc conn query
-    in
-    let (current_book : (Commodity.t * int) list), player_hand =
-      response.current_book, response.player_hand
-    in
-    if (not (List.length current_book = List.length !book))
-       || List.exists2_exn
-            current_book
-            !book
-            ~f:(fun (commodity1, num1) (commodity2, num2) ->
-              not (Commodity.equal commodity1 commodity2 || num1 = num2))
-    then (
-      book := current_book;
-      print_endline "*** UPDATED BOOK ***";
-      print_s [%sexp (!book : (Commodity.t * int) list)]);
-    if not (List.equal Commodity.equal player_hand !hand)
-    then (
-      hand := player_hand;
-      print_endline "*** UPDATED HAND ***";
-      print_s [%sexp (!hand : Commodity.t list)]);
-    return (`Repeat ()))
+  let (query : Rpcs.Player_game_data.Query.t) =
+    { Rpcs.Player_game_data.Query.game_id
+    ; Rpcs.Player_game_data.Query.player_id
+    }
+  in
+  Rpc.Pipe_rpc.dispatch_iter
+    Rpcs.Player_game_data.rpc
+    conn
+    query
+    ~f:(fun response ->
+      match response with
+      | Closed _ ->
+        ();
+        Rpc.Pipe_rpc.Pipe_response.Wait (return ())
+      | Update message ->
+        let ( (current_book : (Commodity.t * int) list)
+            , player_hand
+            , winner_list )
+          =
+          message.current_book, message.player_hand, message.winner_list
+        in
+        (match winner_list with
+         | Some winner_list ->
+           game_over winner_list;
+           Rpc.Pipe_rpc.Pipe_response.Wait (return ())
+         | None ->
+           if (not (List.length current_book = List.length !book))
+              || List.exists2_exn
+                   current_book
+                   !book
+                   ~f:(fun (commodity1, num1) (commodity2, num2) ->
+                     not
+                       (Commodity.equal commodity1 commodity2 || num1 = num2))
+           then (
+             book := current_book;
+             print_endline "*** UPDATED BOOK ***";
+             print_s [%sexp (!book : (Commodity.t * int) list)]);
+           if not (List.equal Commodity.equal player_hand !hand)
+           then (
+             hand := player_hand;
+             print_endline "*** UPDATED HAND ***";
+             print_s [%sexp (!hand : Commodity.t list)]);
+           Rpc.Pipe_rpc.Pipe_response.Continue))
 ;;
 
 let book_data =
@@ -127,7 +142,8 @@ let book_data =
          Rpc.Connection.client (Tcp.Where_to_connect.of_host_and_port port)
        in
        let conn = Result.ok_exn conn_bind in
-       pull_player_data ~conn ~game_id:game ~player_id:player)
+       let%bind _ = pull_player_data ~conn ~game_id:game ~player_id:player in
+       return ())
 ;;
 
 let connect_to_server =
