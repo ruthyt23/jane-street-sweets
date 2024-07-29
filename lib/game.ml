@@ -146,6 +146,7 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
         num_cards
         player.player_id
         other_player_id;
+      Hashtbl.remove game.open_trades num_cards;
       Deferred.return
         (Rpcs.Make_trade.Response.Trade_successful
            (player.player_id, other_player_id)))
