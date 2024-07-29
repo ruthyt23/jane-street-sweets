@@ -95,7 +95,6 @@ let pull_player_data ~conn ~game_id ~player_id =
     conn
     query
     ~f:(fun response ->
-      print_endline "entered function";
       match response with
       | Closed _ ->
         print_endline "pipe closed.";
@@ -107,11 +106,9 @@ let pull_player_data ~conn ~game_id ~player_id =
           =
           message.current_book, message.player_hand, message.winner_list
         in
-        print_endline "message received: ";
-        print_s [%sexp (!hand : Commodity.t list)];
+        (* print_s [%sexp (!hand : Commodity.t list)]; *)
         (match winner_list with
          | Some winner_list ->
-           print_endline "hello";
            game_over winner_list;
            Rpc.Pipe_rpc.Pipe_response.Wait (return ())
          | None ->
@@ -123,14 +120,14 @@ let pull_player_data ~conn ~game_id ~player_id =
                      not
                        (Commodity.equal commodity1 commodity2 || num1 = num2))
            then (
+             let _ = Sys.command "clear" in
              book := current_book;
              print_endline "*** UPDATED BOOK ***";
              print_s [%sexp (!book : (Commodity.t * int) list)]);
-           if not (List.equal Commodity.equal player_hand !hand)
-           then (
-             hand := player_hand;
-             print_endline "*** UPDATED HAND ***";
-             print_s [%sexp (!hand : Commodity.t list)]);
+           (* if not (List.equal Commodity.equal player_hand !hand) then ( *)
+           hand := player_hand;
+           print_endline "*** UPDATED HAND ***";
+           print_s [%sexp (!hand : Commodity.t list)];
            Rpc.Pipe_rpc.Pipe_response.Continue))
 ;;
 

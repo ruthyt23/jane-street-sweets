@@ -166,6 +166,19 @@ let player_game_data_handle
    response_book ; player_hand ; winner_list = winning_players } in *)
 (* Pipe.write writer update))) *)
 
+let ping_listeners (game : Game.t) =
+  let%bind () =
+    Deferred.List.iter
+      ~how:`Parallel
+      game.game_listeners
+      ~f:(fun player_listener_pair ->
+        let player, listener = player_listener_pair in
+        let player_update = get_update_for_player game player in
+        listener player_update)
+  in
+  return ()
+;;
+
 let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
   printf
     "Player %d is trying to trade %d of commodity %s\n"
@@ -190,9 +203,11 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
     (match result with
      | Rpcs.Make_trade.Response.In_book ->
        print_endline "Order placed in book";
+       let%bind () = ping_listeners game in
        Deferred.return result
      | Rpcs.Make_trade.Response.Trade_rejected msg ->
        print_endline msg;
+       let%bind () = ping_listeners game in
        Deferred.return result
      | Rpcs.Make_trade.Response.Trade_successful players_involved ->
        (* print_endline "Order successful"); *)
@@ -202,16 +217,10 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
           ~f:(fun player_listener_pair -> let curr_player_id, _ =
           player_listener_pair in equal curr_player_id player_id_1 || equal
           curr_player_id player_id_2) *)
-       let%bind () =
-         Deferred.List.iter
-           ~how:`Parallel
-           game.game_listeners
-           ~f:(fun player_listener_pair ->
-             let player, listener = player_listener_pair in
-             let player_update = get_update_for_player game player in
-             listener player_update)
-       in
+
+       (* in *)
        print_endline "Order Successful";
+       let%bind () = ping_listeners game in
        Deferred.return result)
 (* let%bind () = Deferred.List.iter ~how:`Parallel game.game_li ~f:(fun
    listener -> listener update) *)
