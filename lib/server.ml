@@ -197,17 +197,15 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
      | Rpcs.Make_trade.Response.Trade_successful players_involved ->
        (* print_endline "Order successful"); *)
        (* iterating through game_listeners will write to the pipe *)
-       let player_id_1, player_id_2 = players_involved in
-       let relevant_game_listeners =
-         List.filter game.game_listeners ~f:(fun player_listener_pair ->
-           let curr_player_id, _ = player_listener_pair in
-           equal curr_player_id player_id_1
-           || equal curr_player_id player_id_2)
-       in
+       let _, _ = players_involved in
+       (* let relevant_game_listeners = List.filter game.game_listeners
+          ~f:(fun player_listener_pair -> let curr_player_id, _ =
+          player_listener_pair in equal curr_player_id player_id_1 || equal
+          curr_player_id player_id_2) *)
        let%bind () =
          Deferred.List.iter
            ~how:`Parallel
-           relevant_game_listeners
+           game.game_listeners
            ~f:(fun player_listener_pair ->
              let player, listener = player_listener_pair in
              let player_update = get_update_for_player game player in
