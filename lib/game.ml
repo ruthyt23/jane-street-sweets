@@ -8,6 +8,8 @@ type t =
   ; open_trades : (int, int * Commodity.t) Hashtbl.t
   ; mutable game_full : bool
   ; game_id : int
+  ; mutable game_listeners :
+      (Rpcs.Player_game_data.Response.t -> unit Deferred.t) list
   }
 [@@deriving sexp_of]
 
@@ -184,7 +186,13 @@ let create_empty_game game_id =
   ; open_trades = Hashtbl.create (module Int)
   ; game_full = false
   ; game_id
+  ; game_listeners = []
   }
+;;
+
+let add_to_game_listeners game listener =
+  let new_game_listeners = List.append game.game_listeners [ listener ] in
+  game.game_listeners <- new_game_listeners
 ;;
 
 let start_game t =

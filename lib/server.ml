@@ -35,7 +35,6 @@ module Game_manager = struct
   type t =
     { games_waiting_to_start : (int, Game.t) Hashtbl.t
     ; games_that_have_started : Game.t Queue.t
-    ; mutable game_listeners : (Game.t * (Update.t -> unit Deferred.t)) list
     }
 
   let create () =
@@ -47,10 +46,7 @@ module Game_manager = struct
           ~key:(3 + num_players)
           ~data:(Game.create_empty_game num_players))
     in
-    { games_waiting_to_start
-    ; games_that_have_started = Queue.create ()
-    ; game_listeners = []
-    }
+    { games_waiting_to_start; games_that_have_started = Queue.create () }
   ;;
 
   (* To make sure our memeory doesn't grow unbounded, maybe add a feature to
@@ -125,7 +121,9 @@ let player_game_data_handle
             (fun writer ->
                (* ********************************* *)
                (* these anonymous functions defined in this have access to writer *)
-               add_to_game_listeners (fun update -> Pipe.write update))))
+               return
+                 (Game.add_to_game_listeners game (fun update ->
+                    Pipe.write writer update)))))
 ;;
 
 (* ********************************* *)
@@ -171,6 +169,8 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
      | Rpcs.Make_trade.Response.Trade_rejected msg -> print_endline msg
      | Rpcs.Make_trade.Response.Trade_successful ->
        print_endline "Order successful");
+    (* iterating through game_listeners will write to the pipe *)
+    List.iter game.game_listeners ~f:(fun _ -> ());
     Deferred.return result
 ;;
 
