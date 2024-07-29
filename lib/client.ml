@@ -111,6 +111,7 @@ let pull_player_data ~conn ~game_id ~player_id =
         print_s [%sexp (!hand : Commodity.t list)];
         (match winner_list with
          | Some winner_list ->
+           print_endline "hello";
            game_over winner_list;
            Rpc.Pipe_rpc.Pipe_response.Wait (return ())
          | None ->
