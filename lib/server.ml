@@ -2,7 +2,6 @@ open! Core
 open! Async
 open! Fzf
 
-(* Generates player id for next queued player *)
 module Player_id_manager = struct
   type t = int ref
 
@@ -27,6 +26,9 @@ module Game_id_manager = struct
   ;;
 end
 
+(* Module Update will give players updates for the following three things 1)
+   Their player hand if it changes 2) The book log if it changes 3) Game
+   winners if there is a winner *)
 module Update = struct
   type t = Rpcs.Player_game_data.Response.t
 end
@@ -48,10 +50,6 @@ module Game_manager = struct
     in
     { games_waiting_to_start; games_that_have_started = Queue.create () }
   ;;
-
-  (* To make sure our memeory doesn't grow unbounded, maybe add a feature to
-     cleanup games that have already finished *)
-  let clean_up () = 0
 end
 
 let game_id_manager = Game_id_manager.create ()
@@ -87,49 +85,49 @@ let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
     }
 ;;
 
-let game_data_handle (_client : unit) (query : Rpcs.Game_state.Query.t) =
-  let game_opt =
-    Queue.find game_manager.games_that_have_started ~f:(fun game ->
-      equal game.game_id query)
-  in
-  match game_opt with
-  | Some game ->
-    let winning_players = Game.check_for_wins game in
-    (match Int.(List.length winning_players >= 1) with
-     | true -> return (Rpcs.Game_state.Response.Game_over winning_players)
-     | false ->
-       (* let player_hand = Game.get_hand_for_player game query in *)
-       return Rpcs.Game_state.Response.In_progress)
-  | None -> Deferred.return Rpcs.Game_state.Response.Waiting
+let find_game (game_id : int) =
+  Queue.find game_manager.games_that_have_started ~f:(fun game ->
+    equal game.game_id game_id)
 ;;
 
-let get_update_for_player (game : Game.t) player_id =
+let game_data_handle (_client : unit) (query : Rpcs.Game_state.Query.t) =
+  let game_opt = find_game query in
+  match game_opt with
+  | None -> Deferred.return Rpcs.Game_state.Response.Waiting
+  | Some game ->
+    (match Game.has_winners game with
+     | true ->
+       return
+         (Rpcs.Game_state.Response.Game_over
+            (Game.get_list_of_winning_players game))
+     | false -> return Rpcs.Game_state.Response.In_progress)
+;;
+
+let get_player_hand_update (game : Game.t) player_id =
+  let player_hand = Game.get_hand_for_player game player_id in
+  Rpcs.Player_game_data.Response.Hand_updated player_hand
+;;
+
+let get_book_update (game : Game.t) =
   let list_of_trade_amounts = Hashtbl.keys game.open_trades in
   let response_book =
     List.map list_of_trade_amounts ~f:(fun amount_to_trade ->
       let _, commodity = Hashtbl.find_exn game.open_trades amount_to_trade in
       commodity, amount_to_trade)
   in
-  let player_hand = Game.get_hand_for_player game player_id in
-  let winning_players =
-    match List.length (Game.check_for_wins game) >= 1 with
-    | true -> Some (Game.check_for_wins game)
-    | false -> None
-  in
-  { Rpcs.Player_game_data.Response.current_book = response_book
-  ; player_hand
-  ; winner_list = winning_players
-  }
+  Rpcs.Player_game_data.Response.Book_updated response_book
+;;
+
+let get_winners_update (game : Game.t) =
+  let list_of_winners = Game.get_list_of_winning_players game in
+  Rpcs.Player_game_data.Response.Game_won list_of_winners
 ;;
 
 let player_game_data_handle
   (_client : unit)
   (query : Rpcs.Player_game_data.Query.t)
   =
-  let game_opt =
-    Queue.find game_manager.games_that_have_started ~f:(fun game ->
-      equal game.game_id query.game_id)
-  in
+  let game_opt = find_game query.game_id in
   match game_opt with
   | None -> return (Error ())
   | Some game ->
@@ -139,42 +137,51 @@ let player_game_data_handle
          (Async_kernel.Pipe.create_reader
             ~close_on_exception:true
             (fun writer ->
-               (* ********************************* *)
-               (* these anonymous functions defined in this have access to writer *)
-               let immediate_update =
-                 get_update_for_player game query.player_id
+               let starting_hand =
+                 get_player_hand_update game query.player_id
                in
-               let%bind () = Pipe.write writer immediate_update in
+               let%bind () = Pipe.write writer starting_hand in
                Game.add_to_game_listeners game query.player_id (fun update ->
                  Pipe.write writer update);
                Deferred.never ())))
 ;;
 
-(* ********************************* *)
-
-(* then whenever we change the game state, go through all the game listeners
-   and then call the functions *)
-
-(* let list_of_trade_amounts = Hashtbl.keys game.open_trades in let
-   response_book = List.map list_of_trade_amounts ~f:(fun amount_to_trade ->
-   let _, commodity = Hashtbl.find_exn game.open_trades amount_to_trade in
-   commodity, amount_to_trade) in let player_hand = Game.get_hand_for_player
-   game query.player_id in let winning_players = match List.length
-   (Game.check_for_wins game) >= 1 with | true -> Some (Game.check_for_wins
-   game) | false -> None in (* print_s [%message (player_hand : Commodity.t
-   list)]; *) let update = { Rpcs.Player_game_data.Response.current_book =
-   response_book ; player_hand ; winner_list = winning_players } in *)
-(* Pipe.write writer update))) *)
-
-let ping_listeners (game : Game.t) =
+let ping_book_updates (game : Game.t) =
+  let updated_book = get_book_update game in
   let%bind () =
     Deferred.List.iter
       ~how:`Parallel
       game.game_listeners
       ~f:(fun player_listener_pair ->
-        let player, listener = player_listener_pair in
-        let player_update = get_update_for_player game player in
-        listener player_update)
+        let _, listener = player_listener_pair in
+        listener updated_book)
+  in
+  return ()
+;;
+
+let ping_player_hand_update (game : Game.t) (player_id_to_ping : int) =
+  let updated_hand = get_player_hand_update game player_id_to_ping in
+  let listener_pair_to_ping =
+    List.find game.game_listeners ~f:(fun player_listener_pair ->
+      let player, _ = player_listener_pair in
+      Int.equal player player_id_to_ping)
+  in
+  match listener_pair_to_ping with
+  | None -> failwith "Trying to ping to a listener that doesn't exist"
+  | Some listener_pair ->
+    let _, listener = listener_pair in
+    listener updated_hand
+;;
+
+let ping_game_won_updates (game : Game.t) =
+  let updated_winners = get_winners_update game in
+  let%bind () =
+    Deferred.List.iter
+      ~how:`Parallel
+      game.game_listeners
+      ~f:(fun player_listener_pair ->
+        let _, listener = player_listener_pair in
+        listener updated_winners)
   in
   return ()
 ;;
@@ -185,10 +192,7 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
     query.player_id
     query.quantity
     (Commodity.to_string query.commodity);
-  let game_opt =
-    Queue.find game_manager.games_that_have_started ~f:(fun game ->
-      equal game.game_id query.game_id)
-  in
+  let game_opt = find_game query.game_id in
   match game_opt with
   | None -> failwith "trying to trade with no game"
   | Some game ->
@@ -203,27 +207,22 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
     (match result with
      | Rpcs.Make_trade.Response.In_book ->
        print_endline "Order placed in book";
-       let%bind () = ping_listeners game in
+       let%bind () = ping_book_updates game in
        Deferred.return result
      | Rpcs.Make_trade.Response.Trade_rejected msg ->
        print_endline msg;
-       let%bind () = ping_listeners game in
        Deferred.return result
      | Rpcs.Make_trade.Response.Trade_successful players_involved ->
-       (* print_endline "Order successful"); *)
-       (* iterating through game_listeners will write to the pipe *)
-       let _, _ = players_involved in
-       (* let relevant_game_listeners = List.filter game.game_listeners
-          ~f:(fun player_listener_pair -> let curr_player_id, _ =
-          player_listener_pair in equal curr_player_id player_id_1 || equal
-          curr_player_id player_id_2) *)
-
-       (* in *)
        print_endline "Order Successful";
-       let%bind () = ping_listeners game in
-       Deferred.return result)
-(* let%bind () = Deferred.List.iter ~how:`Parallel game.game_li ~f:(fun
-   listener -> listener update) *)
+       let player_1, player_2 = players_involved in
+       let%bind () = ping_player_hand_update game player_1 in
+       let%bind () = ping_player_hand_update game player_2 in
+       let%bind () = ping_book_updates game in
+       (match Game.has_winners game with
+        | false -> Deferred.return result
+        | true ->
+          let%bind () = ping_game_won_updates game in
+          Deferred.return result))
 ;;
 
 Core.Result.ok

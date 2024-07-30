@@ -57,13 +57,15 @@ let win_checker (player : Player.t) =
       Commodity.equal first_commodity commodity)
 ;;
 
-let check_for_wins t =
+let get_list_of_winning_players t =
   let winners =
     List.filter t.players ~f:(fun player -> win_checker player)
   in
   List.map winners ~f:(fun winning_player ->
     winning_player, List.hd_exn winning_player.hand)
 ;;
+
+let has_winners t = List.length (get_list_of_winning_players t) > 0
 
 let get_player (game : t) player_id =
   let players_list = game.players in
