@@ -99,33 +99,18 @@ let pull_player_data ~conn ~game_id ~player_id =
       | Closed _ ->
         print_endline "pipe closed.";
         Rpc.Pipe_rpc.Pipe_response.Wait (return ())
-      | Update message ->
-        let ( (current_book : (Commodity.t * int) list)
-            , player_hand
-            , winner_list )
-          =
-          message.current_book, message.player_hand, message.winner_list
-        in
-        (* print_s [%sexp (!hand : Commodity.t list)]; *)
-        (match winner_list with
-         | Some winner_list ->
+      | Update update ->
+        (match update with
+         | Game_won winner_list ->
            game_over winner_list;
            Rpc.Pipe_rpc.Pipe_response.Wait (return ())
-         | None ->
-           if (not (List.length current_book = List.length !book))
-              || List.exists2_exn
-                   current_book
-                   !book
-                   ~f:(fun (commodity1, num1) (commodity2, num2) ->
-                     not
-                       (Commodity.equal commodity1 commodity2 || num1 = num2))
-           then (
-             let _ = Sys.command "clear" in
-             book := current_book;
-             print_endline "*** UPDATED BOOK ***";
-             print_s [%sexp (!book : (Commodity.t * int) list)]);
-           (* if not (List.equal Commodity.equal player_hand !hand) then ( *)
-           hand := player_hand;
+         | Book_updated current_book ->
+           book := current_book;
+           print_endline "*** UPDATED BOOK ***";
+           print_s [%sexp (!book : (Commodity.t * int) list)];
+           Rpc.Pipe_rpc.Pipe_response.Continue
+         | Hand_updated current_hand ->
+           hand := current_hand;
            print_endline "*** UPDATED HAND ***";
            print_s [%sexp (!hand : Commodity.t list)];
            Rpc.Pipe_rpc.Pipe_response.Continue))

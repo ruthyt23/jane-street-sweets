@@ -225,8 +225,6 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
           Deferred.return result))
 ;;
 
-Core.Result.ok
-
 let implementations =
   Rpc.Implementations.create_exn
     ~on_unknown_rpc:`Close_connection

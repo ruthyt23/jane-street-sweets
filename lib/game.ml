@@ -14,30 +14,6 @@ type t =
   }
 [@@deriving sexp_of]
 
-(* let create_game_from_names (list_of_player_names : String.t list) = let
-   num_players = List.length list_of_player_names in let players = List.init
-   num_players ~f:(fun idx -> Player. { player_id = idx + 1 ; hand = [] ;
-   player_name = List.nth_exn list_of_player_names idx }) in (* Get all the
-   types of commodities that we are trading and initialize with quantity 9
-   for each commodity *) let commodities_traded = Hashtbl.create (module
-   Commodity) in let types_of_commodities_traded = Commodity.game_commodities
-   num_players in List.iter types_of_commodities_traded ~f:(fun commodity ->
-   Hashtbl.set commodities_traded ~key:commodity ~data:9); let open_trades =
-   Hashtbl.create (module Int) in { players; commodities_traded; open_trades
-   } ;;
-
-   let create_game num_players = (* Number of players is equal to the number
-   of commodites traded *) let players = List.init num_players ~f:(fun
-   player_id -> Player.{ player_id = player_id + 1; hand = []; player_name =
-   "" }) in (* Get all the types of commodities that we are trading and
-   initialize with quantity 9 for each commodity *) let commodities_traded =
-   Hashtbl.create (module Commodity) in let types_of_commodities_traded =
-   Commodity.game_commodities num_players in List.iter
-   types_of_commodities_traded ~f:(fun commodity -> Hashtbl.set
-   commodities_traded ~key:commodity ~data:9); let open_trades =
-   Hashtbl.create (module Int) in { players; commodities_traded; open_trades
-   } ;; *)
-
 let get_hand_for_player t target_player_id =
   let target_player =
     List.find_exn t.players ~f:(fun player ->
@@ -222,4 +198,64 @@ let start_game t =
 let add_player_to_game t player =
   let new_players_list = List.append t.players [ player ] in
   t.players <- new_players_list
+;;
+
+let get_player_hand_update (game : t) player_id =
+  let player_hand = get_hand_for_player game player_id in
+  Rpcs.Player_game_data.Response.Hand_updated player_hand
+;;
+
+let get_book_update (game : t) =
+  let list_of_trade_amounts = Hashtbl.keys game.open_trades in
+  let response_book =
+    List.map list_of_trade_amounts ~f:(fun amount_to_trade ->
+      let _, commodity = Hashtbl.find_exn game.open_trades amount_to_trade in
+      commodity, amount_to_trade)
+  in
+  Rpcs.Player_game_data.Response.Book_updated response_book
+;;
+
+let get_winners_update (game : t) =
+  let list_of_winners = get_list_of_winning_players game in
+  Rpcs.Player_game_data.Response.Game_won list_of_winners
+;;
+
+let ping_book_updates (game : t) =
+  let updated_book = get_book_update game in
+  let%bind () =
+    Deferred.List.iter
+      ~how:`Parallel
+      game.game_listeners
+      ~f:(fun player_listener_pair ->
+        let _, listener = player_listener_pair in
+        listener updated_book)
+  in
+  return ()
+;;
+
+let ping_player_hand_update (game : t) (player_id_to_ping : int) =
+  let updated_hand = get_player_hand_update game player_id_to_ping in
+  let listener_pair_to_ping =
+    List.find game.game_listeners ~f:(fun player_listener_pair ->
+      let player, _ = player_listener_pair in
+      Int.equal player player_id_to_ping)
+  in
+  match listener_pair_to_ping with
+  | None -> failwith "Trying to ping to a listener that doesn't exist"
+  | Some listener_pair ->
+    let _, listener = listener_pair in
+    listener updated_hand
+;;
+
+let ping_game_won_updates (game : t) =
+  let updated_winners = get_winners_update game in
+  let%bind () =
+    Deferred.List.iter
+      ~how:`Parallel
+      game.game_listeners
+      ~f:(fun player_listener_pair ->
+        let _, listener = player_listener_pair in
+        listener updated_winners)
+  in
+  return ()
 ;;
