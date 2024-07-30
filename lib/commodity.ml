@@ -37,14 +37,14 @@ let to_string t =
 
 let of_string str =
   match str with
-  | "Fairlife" -> Fairlife
-  | "Pocky" -> Pocky
-  | "Water" -> Water
-  | "Boba" -> Boba
-  | "Mango" -> Mango
-  | "Starburst" -> Starburst
-  | "Hint" -> Hint
-  | "Gum" -> Gum
-  | "Kitkat" -> Kitkat
-  | _ -> failwith "not a valid commodity"
+  | "Fairlife" -> Some Fairlife
+  | "Pocky" -> Some Pocky
+  | "Water" -> Some Water
+  | "Boba" -> Some Boba
+  | "Mango" -> Some Mango
+  | "Starburst" -> Some Starburst
+  | "Hint" -> Some Hint
+  | "Gum" -> Some Gum
+  | "Kitkat" -> Some Kitkat
+  | _ -> None
 ;;

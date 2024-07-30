@@ -94,8 +94,7 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
     (* print_endline "Trade Rejected: Invalid number of cards - must be
        1-4."; *)
     Deferred.return
-      (Rpcs.Make_trade.Response.Trade_rejected
-         "Invalid number of cards - must be 1-4")
+      (Rpcs.Make_trade.Response.Trade_rejected "Not enough cards to trade")
   else if List.mem (Hashtbl.keys game.open_trades) num_cards ~equal:Int.equal
   then (
     let other_player_id, other_commodity =

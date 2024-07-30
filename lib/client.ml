@@ -34,23 +34,37 @@ let handle_trade ~conn ~commodity ~num_cards =
   return ()
 ;;
 
-let make_trades ~conn =
+let prompt_user_for_commodity () =
+  Core.print_endline "\nWhat commodity would you like to trade? ";
+  Stdlib.read_line () |> Commodity.of_string
+;;
+
+let prompt_user_for_quantity () =
   let num_cards_string_list =
     List.init 4 ~f:(fun num -> Int.to_string (num + 1))
   in
-  Core.printf "\nWhat commodity would you like to trade? ";
-  let commodity = Stdlib.read_line () |> Commodity.of_string in
   Core.print_endline "How many would you like to trade? (1-4) ";
   let selection_for_numcards = Pick_from.inputs num_cards_string_list in
   let%bind num_cards_opt =
     pick_one selection_for_numcards ~prompt_at_top:() ~height:7
   in
   match num_cards_opt |> ok_exn with
-  | None -> return ()
-  | Some cards ->
-    printf "Number of cards: %s\n" cards;
-    let num_cards = Int.of_string cards in
-    handle_trade ~conn ~commodity ~num_cards
+  | None -> failwith "User didn't select a valid value with fuzzy finder"
+  | Some cards -> return (Int.of_string cards)
+;;
+
+let make_trades_loop ~conn =
+  Deferred.repeat_until_finished () (fun _ ->
+    let commodity_opt = prompt_user_for_commodity () in
+    match commodity_opt with
+    | None ->
+      Core.print_endline "Trade rejected, not a valid commodity";
+      return (`Repeat ())
+    | Some commodity ->
+      let quantity = prompt_user_for_quantity () in
+      let%bind num_cards = quantity in
+      let%bind () = handle_trade ~conn ~commodity ~num_cards in
+      return (`Repeat ()))
 ;;
 
 let game_over winner_list =
@@ -73,7 +87,7 @@ let pull_game_state ~conn =
     | Rpcs.Game_state.Response.In_progress ->
       if List.is_empty !hand
       then Core.print_endline "\n*** WELCOME TO PIT! ***";
-      let%bind () = make_trades ~conn in
+      let%bind () = make_trades_loop ~conn in
       return (`Repeat ())
     | Rpcs.Game_state.Response.Game_over winner_list ->
       game_over winner_list;
