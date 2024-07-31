@@ -1,6 +1,7 @@
 open! Core
 open! Async
 open! Fzf
+open Curses
 
 let (connection : Rpc.Connection.t option ref) = ref None
 let game_id = ref 0
@@ -205,8 +206,40 @@ let connect_to_server =
        pull_game_state ~conn)
 ;;
 
+let ncurses_testing =
+  Command.async
+    ~summary:"Live updating of book data"
+    (let%map_open.Command () = return () in
+     fun () ->
+       (* Initialize the ncurses library *)
+       let _ = initscr () in
+       (* Turn off input buffering *)
+       let _ = cbreak () in
+       (* Don't display typed characters on the screen *)
+       let _ = noecho () in
+       (* Create a new window *)
+       let window = newwin 10 40 0 0 in
+       let _ = refresh () in
+       (* Display text in the window *)
+       let _ = box window 1 1 in
+       let _ = mvwaddstr window 4 4 "Hello, ncurses in OCaml!" in
+       let _ = wrefresh window in
+       let subwindow = newwin 10 40 11 0 in
+       let _ = box subwindow 65 66 in
+       let _ = mvwaddstr subwindow 4 4 "Hello, ncurses in OCaml!" in
+       let _ = wrefresh subwindow in
+       (* Refresh the window to show the text *)
+       (* Clean up and close ncurses *)
+       let _ = getch () in
+       let () = endwin () in
+       return ())
+;;
+
 let command =
   Command.group
     ~summary:"Pit Player"
-    [ "join-game", connect_to_server; "book-data", get_book_and_hand_data ]
+    [ "join-game", connect_to_server
+    ; "book-data", get_book_and_hand_data
+    ; "ncurses", ncurses_testing
+    ]
 ;;

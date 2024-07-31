@@ -1,6 +1,6 @@
 (library
  (name game_lib)
- (libraries async core core_unix.command_unix fzf polling_state_rpc)
+ (libraries async core core_unix.command_unix fzf polling_state_rpc curses)
  (inline_tests)
  (preprocess
   (pps ppx_jane)))

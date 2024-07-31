@@ -73,10 +73,10 @@ let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
   (* Check if game is ready to start *)
   (* if the game is full, then replace the game in the hashtable of games
      waiting to start *)
-  if game_to_join.game_full
+  if List.length game_to_join.players = query.num_players
   then (
+    game_to_join.game_full <- true;
     Game.start_game game_to_join;
-    printf "Game %d has started\n" response_game_id;
     Queue.enqueue game_manager.games_that_have_started game_to_join;
     Hashtbl.set
       game_manager.games_waiting_to_start
@@ -88,6 +88,8 @@ let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
     query.name
     response_game_id
     response_player_id;
+  if game_to_join.game_full
+  then printf "Game %d has started\n" response_game_id;
   Deferred.return
     { Rpcs.Waiting_room.Response.game_id = response_game_id
     ; player_id = response_player_id
