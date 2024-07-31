@@ -22,8 +22,6 @@ let get_hand_for_player t target_player_id =
   target_player.hand
 ;;
 
-(* cleanup later on *)
-(* Caused an error when we used Game_lib.win_check *)
 let win_checker (player : Player.t) =
   match equal (List.length player.hand) 0 with
   | true -> false

@@ -17,7 +17,8 @@ end
 module Game_id_manager = struct
   type t = int ref
 
-  let create () = ref 100
+  (* Start from 7 because games 0-6 are created when the server starts *)
+  let create () = ref 7
 
   let next_id t =
     let this_id = !t in
@@ -69,7 +70,10 @@ let waiting_handle (_client : unit) (query : Rpcs.Waiting_room.Query.t) =
   in
   let response_game_id = game_to_join.game_id in
   Game.add_player_to_game game_to_join player_obj;
-  if equal (List.length game_to_join.players) query.num_players
+  (* Check if game is ready to start *)
+  (* if the game is full, then replace the game in the hashtable of games
+     waiting to start *)
+  if game_to_join.game_full
   then (
     Game.start_game game_to_join;
     printf "Game %d has started\n" response_game_id;
@@ -111,12 +115,15 @@ let player_game_data_handle
   match game_opt with
   | None -> return (Error ())
   | Some game ->
-    print_endline "Pipe created";
     return
       (Ok
          (Async_kernel.Pipe.create_reader
             ~close_on_exception:true
             (fun writer ->
+               printf
+                 "Listener created for player %d in game %d\n"
+                 query.player_id
+                 query.game_id;
                let starting_hand =
                  Game.get_player_hand_update game query.player_id
                in
@@ -136,11 +143,7 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
   match game_opt with
   | None -> failwith "trying to trade with no game"
   | Some game ->
-    let players_list = game.players in
-    let player_obj =
-      List.find_exn players_list ~f:(fun player ->
-        equal player.player_id query.player_id)
-    in
+    let player_obj = Game.get_player game query.player_id in
     let%bind result =
       Game.handle_trade game player_obj query.commodity query.quantity
     in
@@ -183,7 +186,7 @@ let start_game =
     ~summary:"Play"
     (let%map_open.Command () = return ()
      and port = flag "-port" (required int) ~doc:"_ port to listen\n   on" in
-     print_endline "About to start server...";
+     print_endline "Server Started";
      fun () ->
        let%bind server =
          Rpc.Connection.serve

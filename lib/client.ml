@@ -14,6 +14,15 @@ let print_hand hand =
     printf "%s  " (Commodity.to_string commodity))
 ;;
 
+let game_over winner_list =
+  if List.length winner_list = 1
+  then Core.print_endline "GAME OVER! WINNER: "
+  else Core.print_endline "GAME OVER! WINNERS: ";
+  List.iter winner_list ~f:(fun ((player : Player.t), commodity) ->
+    Core.print_endline
+      [%string "%{player.player_name#String} with %{commodity#Commodity}"])
+;;
+
 let handle_trade ~conn ~commodity ~num_cards =
   let query =
     { Rpcs.Make_trade.Query.player_id = !player_id
@@ -34,11 +43,13 @@ let handle_trade ~conn ~commodity ~num_cards =
   return ()
 ;;
 
+(* Helper for making trades *)
 let prompt_user_for_commodity () =
   Core.print_endline "\nWhat commodity would you like to trade? ";
   Stdlib.read_line () |> Commodity.of_string
 ;;
 
+(* Helper for making trades *)
 let prompt_user_for_quantity () =
   let num_cards_string_list =
     List.init 4 ~f:(fun num -> Int.to_string (num + 1))
@@ -67,15 +78,6 @@ let make_trades_loop ~conn =
       return (`Repeat ()))
 ;;
 
-let game_over winner_list =
-  if List.length winner_list = 1
-  then Core.print_endline "GAME OVER! WINNER: "
-  else Core.print_endline "GAME OVER! WINNERS: ";
-  List.iter winner_list ~f:(fun ((player : Player.t), commodity) ->
-    Core.print_endline
-      [%string "%{player.player_name#String} with %{commodity#Commodity}"])
-;;
-
 let pull_game_state ~conn =
   Deferred.repeat_until_finished () (fun _ ->
     let (query : Rpcs.Game_state.Query.t) = !game_id in
@@ -98,6 +100,7 @@ let pull_game_state ~conn =
       return (`Repeat ()))
 ;;
 
+(* Helper for get_book_and_hand data *)
 let pull_player_data ~conn ~game_id ~player_id =
   let (query : Rpcs.Player_game_data.Query.t) =
     { Rpcs.Player_game_data.Query.game_id
@@ -130,7 +133,32 @@ let pull_player_data ~conn ~game_id ~player_id =
            Rpc.Pipe_rpc.Pipe_response.Continue))
 ;;
 
-let book_data =
+(* Helper function for connect to server *)
+let check_valid_player_count num_players =
+  match num_players < 3 || num_players > 9 with
+  | true -> failwith "Invalid number of players: msut be between 3-9"
+  | false -> ()
+;;
+
+(* Helper function for connect to server *)
+let initial_dispatch_to_server ~name ~host ~port ~num_players =
+  let host_and_port = Host_and_port.create ~host ~port in
+  let join_game_query =
+    { Rpcs.Waiting_room.Query.name; Rpcs.Waiting_room.Query.num_players }
+  in
+  let conn () =
+    Rpc.Connection.client
+      (Tcp.Where_to_connect.of_host_and_port host_and_port)
+    >>| Result.ok_exn
+  in
+  let%bind conn_bind = conn () in
+  let%bind (initial_game_data : Rpcs.Waiting_room.Response.t) =
+    Rpc.Rpc.dispatch_exn Rpcs.Waiting_room.rpc conn_bind join_game_query
+  in
+  return (initial_game_data, conn)
+;;
+
+let get_book_and_hand_data =
   Command.async
     ~summary:"Live updating of book data"
     (let%map_open.Command () = return ()
@@ -162,39 +190,23 @@ let connect_to_server =
      and host = flag "-host" (required string) ~doc:"_ host name"
      and int_port = flag "-port" (required int) ~doc:"_ port to listen on" in
      fun () ->
-       if num_players < 3 || num_players > 9
-       then failwith "Invalid number of players: must be between 3-9."
-       else (
-         let host_and_port = Host_and_port.create ~host ~port:int_port in
-         let join_game_query =
-           { Rpcs.Waiting_room.Query.name
-           ; Rpcs.Waiting_room.Query.num_players
-           }
-         in
-         let conn () =
-           Rpc.Connection.client
-             (Tcp.Where_to_connect.of_host_and_port host_and_port)
-           >>| Result.ok_exn
-         in
-         let%bind conn_bind = conn () in
-         let%bind (initial_game_data : Rpcs.Waiting_room.Response.t) =
-           Rpc.Rpc.dispatch_exn
-             Rpcs.Waiting_room.rpc
-             conn_bind
-             join_game_query
-         in
-         game_id := initial_game_data.game_id;
-         player_id := initial_game_data.player_id;
-         printf
-           "Connected to host %s!\nGame ID: %d\nPlayer ID: %d"
-           host
-           !game_id
-           !player_id;
-         pull_game_state ~conn))
+       check_valid_player_count num_players;
+       let%bind response_from_server =
+         initial_dispatch_to_server ~name ~host ~port:int_port ~num_players
+       in
+       let initial_game_data, conn = response_from_server in
+       game_id := initial_game_data.game_id;
+       player_id := initial_game_data.player_id;
+       printf
+         "Connected to host %s!\nGame ID: %d\nPlayer ID: %d"
+         host
+         !game_id
+         !player_id;
+       pull_game_state ~conn)
 ;;
 
 let command =
   Command.group
     ~summary:"Pit Player"
-    [ "join-game", connect_to_server; "book-data", book_data ]
+    [ "join-game", connect_to_server; "book-data", get_book_and_hand_data ]
 ;;
