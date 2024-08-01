@@ -46,8 +46,8 @@ let update_hand t (hand : Commodity.t list) =
   mvwaddstr t.hand_window 1 1 updated_hand |> prerr
 ;;
 
-let update_book t (book : (Commodity.t * int) list) =
+let update_book t book =
   werase t.book_window;
   let updated_book = Game.book_to_string book in
-  mvwaddstr t.book_window 1 1 updated_book
+  mvwaddstr t.book_window 1 1 updated_book |> prerr
 ;;

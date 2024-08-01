@@ -102,7 +102,7 @@ let pull_game_state ~conn =
 ;;
 
 (* Helper for get_book_and_hand data *)
-let pull_player_data ~conn ~game_id ~player_id =
+let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
   let (query : Rpcs.Player_game_data.Query.t) =
     { Rpcs.Player_game_data.Query.game_id
     ; Rpcs.Player_game_data.Query.player_id
@@ -124,13 +124,11 @@ let pull_player_data ~conn ~game_id ~player_id =
            Rpc.Pipe_rpc.Pipe_response.Wait (return ())
          | Book_updated current_book ->
            book := current_book;
-           print_endline "*** UPDATED BOOK ***";
-           print_s [%sexp (!book : (Commodity.t * int) list)];
+           Ui.update_book ui current_book;
            Rpc.Pipe_rpc.Pipe_response.Continue
          | Hand_updated current_hand ->
            hand := current_hand;
-           print_endline "*** UPDATED HAND ***";
-           print_s [%sexp (!hand : Commodity.t list)];
+           Ui.update_hand ui current_hand;
            Rpc.Pipe_rpc.Pipe_response.Continue))
 ;;
 
@@ -175,9 +173,10 @@ let get_book_and_hand_data =
            (Tcp.Where_to_connect.of_host_and_port host_and_port)
        in
        let conn = Result.ok_exn conn_bind in
+       let ui = Ui.init () in
        let%bind _ =
          (* pass in the UI when the time comes *)
-         pull_player_data ~conn ~game_id:game ~player_id:player
+         pull_player_data ~ui ~conn ~game_id:game ~player_id:player
        in
        Deferred.never ())
 ;;
