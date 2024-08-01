@@ -14,6 +14,21 @@ type t =
   }
 [@@deriving sexp_of]
 
+let book_to_string book =
+  let str_list_book =
+    List.concat_map book ~f:(fun commodity_quantity_pair ->
+      let commodity, quantity = commodity_quantity_pair in
+      [ "("
+      ; Commodity.to_string commodity
+      ; " "
+      ; Int.to_string quantity
+      ; ")"
+      ; "   "
+      ])
+  in
+  String.concat str_list_book
+;;
+
 let get_hand_for_player t target_player_id =
   let target_player =
     List.find_exn t.players ~f:(fun player ->

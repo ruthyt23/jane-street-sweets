@@ -39,3 +39,15 @@ let init () : t =
   let book_window = create_book_window height width in
   { parent_window; height; width; hand_window; book_window }
 ;;
+
+let update_hand t (hand : Commodity.t list) =
+  werase t.hand_window;
+  let updated_hand = Player.hand_to_string hand in
+  mvwaddstr t.hand_window 1 1 updated_hand |> prerr
+;;
+
+let update_book t (book : (Commodity.t * int) list) =
+  werase t.book_window;
+  let updated_book = Game.book_to_string book in
+  mvwaddstr t.book_window 1 1 updated_book
+;;
