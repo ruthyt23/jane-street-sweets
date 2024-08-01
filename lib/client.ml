@@ -1,7 +1,7 @@
 open! Core
 open! Async
 open! Fzf
-open Curses
+open! Curses
 
 let (connection : Rpc.Connection.t option ref) = ref None
 let game_id = ref 0
@@ -169,12 +169,16 @@ let get_book_and_hand_data =
      and player = flag "-player" (required int) ~doc:"_ name of player" in
      fun () ->
        let host_and_port = Host_and_port.create ~host ~port:int_port in
+       (* let ui = Ui.init () in *)
        let%bind conn_bind =
          Rpc.Connection.client
            (Tcp.Where_to_connect.of_host_and_port host_and_port)
        in
        let conn = Result.ok_exn conn_bind in
-       let%bind _ = pull_player_data ~conn ~game_id:game ~player_id:player in
+       let%bind _ =
+         (* pass in the UI when the time comes *)
+         pull_player_data ~conn ~game_id:game ~player_id:player
+       in
        Deferred.never ())
 ;;
 
@@ -206,40 +210,33 @@ let connect_to_server =
        pull_game_state ~conn)
 ;;
 
-let ncurses_testing =
-  Command.async
-    ~summary:"Live updating of book data"
-    (let%map_open.Command () = return () in
-     fun () ->
-       (* Initialize the ncurses library *)
-       let _ = initscr () in
-       (* Turn off input buffering *)
-       let _ = cbreak () in
-       (* Don't display typed characters on the screen *)
-       let _ = noecho () in
-       (* Create a new window *)
-       let window = newwin 10 40 0 0 in
-       let _ = refresh () in
-       (* Display text in the window *)
-       let _ = box window 1 1 in
-       let _ = mvwaddstr window 4 4 "Hello, ncurses in OCaml!" in
-       let _ = wrefresh window in
-       let subwindow = newwin 10 40 11 0 in
-       let _ = box subwindow 65 66 in
-       let _ = mvwaddstr subwindow 4 4 "Hello, ncurses in OCaml!" in
-       let _ = wrefresh subwindow in
-       (* Refresh the window to show the text *)
-       (* Clean up and close ncurses *)
-       let _ = getch () in
-       let () = endwin () in
-       return ())
-;;
+(* let setup_player_data_log ~parent_window_height ~parent_window_width = let
+   log_window_width = parent_window_width / 2 in let log_window = newwin
+   parent_window_height log_window_width 0 log_window_width in box log_window
+   124 45; mvwaddstr log_window 1 1 "This will have the trade option" |>
+   prerr; wrefresh log_window |> prerr; log_window ;;
+
+   let setup_make_trade_input ~parent_window_height ~parent_window_width =
+   let player_data_wdith = parent_window_width / 2 in let player_data_window
+   = newwin parent_window_height player_data_wdith 0 0 in box
+   player_data_window 124 45; mvwaddstr player_data_window 1 1 "This will
+   have the data log" |> prerr; wrefresh player_data_window |> prerr;
+   player_data_window ;;
+
+   let ncurses_testing = Command.async ~summary:"Live updating of book data"
+   (let%map_open.Command () = return () in fun () -> let parent_window =
+   initscr () in (* Turn off input buffering *) cbreak () |> prerr; refresh
+   () |> prerr; let parent_window_height, parent_window_width = getmaxyx
+   parent_window in let player_data_window = setup_player_data_log
+   ~parent_window_height ~parent_window_width in let trade_input_window =
+   setup_make_trade_input ~parent_window_height ~parent_window_width in
+   ignore player_data_window; ignore trade_input_window; let _ = getch () in
+   let () = endwin () in return ()) ;; *)
 
 let command =
   Command.group
     ~summary:"Pit Player"
     [ "join-game", connect_to_server
-    ; "book-data", get_book_and_hand_data
-    ; "ncurses", ncurses_testing
+    ; "book-data", get_book_and_hand_data (* ; "ncurses", ncurses_testing *)
     ]
 ;;
