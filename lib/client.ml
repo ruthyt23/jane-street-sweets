@@ -15,13 +15,18 @@ let print_hand hand =
     printf "%s  " (Commodity.to_string commodity))
 ;;
 
-let game_over winner_list =
-  if List.length winner_list = 1
-  then Core.print_endline "GAME OVER! WINNER: "
-  else Core.print_endline "GAME OVER! WINNERS: ";
-  List.iter winner_list ~f:(fun ((player : Player.t), commodity) ->
-    Core.print_endline
-      [%string "%{player.player_name#String} with %{commodity#Commodity}"])
+let game_over (winner_list : (Player.t * Commodity.t) list) =
+  let game_over_message =
+    match List.length winner_list = 1 with
+    | true -> "GAME OVER! WINNER: "
+    | false -> "GAME OVER! WINNERS: "
+  in
+  List.fold
+    winner_list
+    ~init:game_over_message
+    ~f:(fun message player_commodity_pair ->
+      let winner, _ = player_commodity_pair in
+      message ^ " " ^ winner.player_name)
 ;;
 
 let handle_trade ~conn ~commodity ~num_cards =
@@ -92,9 +97,7 @@ let pull_game_state ~conn =
       then Core.print_endline "\n*** WELCOME TO PIT! ***";
       let%bind () = make_trades_loop ~conn in
       return (`Repeat ())
-    | Rpcs.Game_state.Response.Game_over winner_list ->
-      game_over winner_list;
-      return (`Finished ())
+    | Rpcs.Game_state.Response.Game_over _ -> return (`Finished ())
     | Rpcs.Game_state.Response.Waiting ->
       let span = Time_float.Span.of_ms 250.0 in
       let%bind () = Async.after span in
@@ -120,7 +123,8 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
       | Update update ->
         (match update with
          | Game_won winner_list ->
-           game_over winner_list;
+           let message = game_over winner_list in
+           Ui.update_game_over ui message;
            Rpc.Pipe_rpc.Pipe_response.Wait (return ())
          | Book_updated current_book ->
            book := current_book;
@@ -174,6 +178,8 @@ let get_book_and_hand_data =
        in
        let conn = Result.ok_exn conn_bind in
        let ui = Ui.init () in
+       Ui.update_hand ui !hand;
+       Ui.update_book ui !book;
        let%bind _ =
          (* pass in the UI when the time comes *)
          pull_player_data ~ui ~conn ~game_id:game ~player_id:player
