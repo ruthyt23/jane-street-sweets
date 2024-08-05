@@ -3,6 +3,29 @@ open! Async
 open! Fzf
 open Curses
 
+module State_manager = struct
+  module Current_state = struct
+    type t =
+      | Selecting_Commodity
+      | Selecting_Quantity
+  end
+
+  type t =
+    { mutable hand_cursor : int
+    ; mutable quantity_cursor : int
+    ; mutable hand_selection_list : Commodity.t list
+    ; mutable state : Current_state.t
+    }
+
+  let init () =
+    { hand_cursor = 0
+    ; quantity_cursor = 0
+    ; hand_selection_list = []
+    ; state = Selecting_Commodity
+    }
+  ;;
+end
+
 type t =
   { parent_window : window
   ; height : int
@@ -10,11 +33,18 @@ type t =
   ; make_trade_window : window
   ; hand_window : window
   ; book_window : window
+  ; state_manager : State_manager.t
   }
 
 let acs_codes = get_acs_codes ()
 let nice_box window = box window acs_codes.vline acs_codes.hline
 let erase_and_box window = wclear window
+
+let reset_state_manager t =
+  t.state_manager.state <- Selecting_Commodity;
+  t.state_manager.quantity_cursor <- 0;
+  t.state_manager.hand_cursor <- 0
+;;
 
 let prerr err =
   match err with
@@ -46,7 +76,7 @@ let create_make_trade_window parent_height parent_width =
   let width = parent_width / 2 in
   let window = newwin height width height width in
   nice_box window;
-  mvwaddstr window 1 1 "Input the trade you want to make" |> prerr;
+  mvwaddstr window 1 1 "Select the trade you want to make: " |> prerr;
   let input_window = derwin window 3 (width - 2) 3 1 in
   nice_box input_window;
   window
@@ -78,6 +108,7 @@ let init () : t =
   let hand_window = create_hand_window height width in
   let book_window = create_book_window height width in
   let make_trade_window = create_make_trade_window height width in
+  let state_manager = State_manager.init () in
   let ui =
     { parent_window
     ; height
@@ -85,6 +116,7 @@ let init () : t =
     ; make_trade_window
     ; hand_window
     ; book_window
+    ; state_manager
     }
   in
   refresh_all_windows ui;
@@ -94,6 +126,13 @@ let init () : t =
 let update_hand t (hand : Commodity.t list) =
   reset_hand_window t.hand_window;
   let updated_hand = Player.hand_to_string hand in
+  let hand_selection_list =
+    List.dedup_and_sort hand ~compare:Commodity.compare
+  in
+  t.state_manager.hand_selection_list <- hand_selection_list;
+  t.state_manager.state <- Selecting_Commodity;
+  t.state_manager.quantity_cursor <- 0;
+  t.state_manager.hand_cursor <- 0;
   mvwaddstr t.hand_window 2 1 updated_hand |> prerr;
   refresh_all_windows t
 ;;
