@@ -117,9 +117,7 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
     query
     ~f:(fun response ->
       match response with
-      | Closed _ ->
-        print_endline "pipe closed.";
-        Rpc.Pipe_rpc.Pipe_response.Wait (return ())
+      | Closed _ -> Rpc.Pipe_rpc.Pipe_response.Wait (return ())
       | Update update ->
         (match update with
          | Game_won winner_list ->
