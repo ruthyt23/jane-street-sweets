@@ -137,7 +137,7 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
 (* Helper function for connect to server *)
 let check_valid_player_count num_players =
   match num_players < 3 || num_players > 9 with
-  | true -> failwith "Invalid number of players: msut be between 3-9"
+  | true -> failwith "Invalid number of players: must be between 3-9"
   | false -> ()
 ;;
 
@@ -216,7 +216,5 @@ let connect_to_server =
 let command =
   Command.group
     ~summary:"Pit Player"
-    [ "join-game", connect_to_server
-    ; "book-data", get_book_and_hand_data (* ; "ncurses", ncurses_testing *)
-    ]
+    [ "join-game", connect_to_server; "book-data", get_book_and_hand_data ]
 ;;
