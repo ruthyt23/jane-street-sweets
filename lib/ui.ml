@@ -12,6 +12,10 @@ type t =
   ; book_window : window
   }
 
+let acs_codes = get_acs_codes ()
+let nice_box window = box window acs_codes.vline acs_codes.hline
+let erase_and_box window = wclear window
+
 let prerr err =
   match err with
   | false ->
@@ -24,27 +28,43 @@ let create_hand_window parent_height parent_width =
   let height = parent_height / 2 in
   let width = parent_width / 2 in
   let window = newwin height width 0 width in
-  box window 124 45;
-  window
+  nice_box window;
+  wrefresh window |> prerr;
+  derwin window (height - 2) (width - 2) 1 1
 ;;
 
 let create_book_window parent_height parent_width =
-  let height = parent_height / 2 in
   let width = parent_width / 2 in
-  let window = newwin height width height width in
-  box window 124 45;
-  window
+  let window = newwin parent_height width 0 0 in
+  nice_box window;
+  wrefresh window |> prerr;
+  derwin window (parent_height - 2) (width - 2) 1 1
 ;;
 
 let create_make_trade_window parent_height parent_width =
+  let height = parent_height / 2 in
   let width = parent_width / 2 in
-  let window = newwin parent_height width 0 0 in
-  box window 124 45;
+  let window = newwin height width height width in
+  nice_box window;
+  mvwaddstr window 1 1 "Input the trade you want to make" |> prerr;
+  let input_window = derwin window 3 (width - 2) 3 1 in
+  nice_box input_window;
   window
+;;
+
+let reset_hand_window window =
+  erase_and_box window;
+  waddstr window "Player Hand: " |> prerr
+;;
+
+let reset_book_window window =
+  erase_and_box window;
+  waddstr window "Book Updates: " |> prerr
 ;;
 
 let refresh_all_windows t =
   wrefresh t.parent_window |> prerr;
+  wrefresh t.make_trade_window |> prerr;
   wrefresh t.book_window |> prerr;
   wrefresh t.hand_window |> prerr
 ;;
@@ -72,16 +92,16 @@ let init () : t =
 ;;
 
 let update_hand t (hand : Commodity.t list) =
-  werase t.hand_window;
+  reset_hand_window t.hand_window;
   let updated_hand = Player.hand_to_string hand in
-  mvwaddstr t.hand_window 1 1 updated_hand |> prerr;
+  mvwaddstr t.hand_window 2 1 updated_hand |> prerr;
   refresh_all_windows t
 ;;
 
 let update_book t book =
-  werase t.book_window;
+  reset_book_window t.book_window;
   let updated_book = Game.book_to_string book in
-  mvwaddstr t.book_window 1 1 updated_book |> prerr;
+  mvwaddstr t.book_window 2 1 updated_book |> prerr;
   refresh_all_windows t
 ;;
 
@@ -90,4 +110,10 @@ let update_game_over t message =
   werase t.book_window;
   mvwaddstr t.hand_window 1 1 message |> prerr;
   refresh_all_windows t
+;;
+
+let enable_trade_input t =
+  timeout 0;
+  ignore (getch ());
+  wgetstr t.make_trade_window
 ;;

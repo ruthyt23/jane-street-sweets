@@ -16,8 +16,18 @@ let create_player player_id player_name =
 ;;
 
 let hand_to_string (hand : Commodity.t list) =
+  let commodity_freq = Hashtbl.create (module Commodity) in
+  List.iter hand ~f:(fun commodity ->
+    match Hashtbl.find commodity_freq commodity with
+    | Some count ->
+      Hashtbl.set commodity_freq ~key:commodity ~data:(count + 1)
+    | None -> Hashtbl.set commodity_freq ~key:commodity ~data:1);
   let commodity_str_list =
-    List.map hand ~f:(fun commodity -> Commodity.to_string commodity)
+    List.map (Hashtbl.keys commodity_freq) ~f:(fun commodity ->
+      sprintf
+        "(%s  %d) "
+        (Commodity.to_string commodity)
+        (Hashtbl.find_exn commodity_freq commodity))
   in
   String.concat ~sep:" " commodity_str_list
 ;;
