@@ -49,61 +49,6 @@ let handle_trade ~conn ~commodity ~num_cards =
   return ()
 ;;
 
-(* Helper for making trades *)
-let prompt_user_for_commodity () =
-  Core.print_endline "\nWhat commodity would you like to trade? ";
-  Stdlib.read_line () |> Commodity.of_string
-;;
-
-(* Helper for making trades *)
-let prompt_user_for_quantity () =
-  let num_cards_string_list =
-    List.init 4 ~f:(fun num -> Int.to_string (num + 1))
-  in
-  Core.print_endline "How many would you like to trade? (1-4) ";
-  let selection_for_numcards = Pick_from.inputs num_cards_string_list in
-  let%bind num_cards_opt =
-    pick_one selection_for_numcards ~prompt_at_top:() ~height:7
-  in
-  match num_cards_opt |> ok_exn with
-  | None -> failwith "User didn't select a valid value with fuzzy finder"
-  | Some cards -> return (Int.of_string cards)
-;;
-
-let make_trades_loop ~conn =
-  Deferred.repeat_until_finished () (fun _ ->
-    let commodity_opt = prompt_user_for_commodity () in
-    match commodity_opt with
-    | None ->
-      Core.print_endline "Trade rejected, not a valid commodity";
-      return (`Repeat ())
-    | Some commodity ->
-      let quantity = prompt_user_for_quantity () in
-      let%bind num_cards = quantity in
-      let%bind () = handle_trade ~conn ~commodity ~num_cards in
-      return (`Repeat ()))
-;;
-
-let pull_game_state ~conn =
-  Deferred.repeat_until_finished () (fun _ ->
-    let (query : Rpcs.Game_state.Query.t) = !game_id in
-    let%bind conn_bind = conn () in
-    let%bind (response : Rpcs.Game_state.Response.t) =
-      Rpc.Rpc.dispatch_exn Rpcs.Game_state.rpc conn_bind query
-    in
-    match response with
-    | Rpcs.Game_state.Response.In_progress ->
-      if List.is_empty !hand
-      then Core.print_endline "\n*** WELCOME TO PIT! ***";
-      let%bind () = make_trades_loop ~conn in
-      return (`Repeat ())
-    | Rpcs.Game_state.Response.Game_over _ -> return (`Finished ())
-    | Rpcs.Game_state.Response.Waiting ->
-      let span = Time_float.Span.of_ms 250.0 in
-      let%bind () = Async.after span in
-      return (`Repeat ()))
-;;
-
 (* Helper for get_book_and_hand data *)
 let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
   let (query : Rpcs.Player_game_data.Query.t) =
@@ -111,9 +56,10 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
     ; Rpcs.Player_game_data.Query.player_id
     }
   in
+  let%bind conn_bind = conn () in
   Rpc.Pipe_rpc.dispatch_iter
     Rpcs.Player_game_data.rpc
-    conn
+    conn_bind
     query
     ~f:(fun response ->
       match response with
@@ -132,6 +78,21 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
            hand := current_hand;
            Ui.update_hand ui current_hand;
            Rpc.Pipe_rpc.Pipe_response.Continue))
+;;
+
+let waiting_room ~conn =
+  Deferred.repeat_until_finished () (fun _ ->
+    let (query : Rpcs.Game_state.Query.t) = !game_id in
+    let%bind conn_bind = conn () in
+    let%bind (response : Rpcs.Game_state.Response.t) =
+      Rpc.Rpc.dispatch_exn Rpcs.Game_state.rpc conn_bind query
+    in
+    match response with
+    | Rpcs.Game_state.Response.Waiting ->
+      let span = Time_float.Span.of_ms 250.0 in
+      let%bind () = Async.after span in
+      return (`Repeat ())
+    | _ -> return (`Finished ()))
 ;;
 
 (* Helper function for connect to server *)
@@ -159,32 +120,6 @@ let initial_dispatch_to_server ~name ~host ~port ~num_players =
   return (initial_game_data, conn)
 ;;
 
-let get_book_and_hand_data =
-  Command.async
-    ~summary:"Live updating of book data"
-    (let%map_open.Command () = return ()
-     and host = flag "-host" (required string) ~doc:"_ host name"
-     and int_port = flag "-port" (required int) ~doc:"_ port to listen on"
-     and game = flag "-game" (required int) ~doc:"_ name of player"
-     and player = flag "-player" (required int) ~doc:"_ name of player" in
-     fun () ->
-       let host_and_port = Host_and_port.create ~host ~port:int_port in
-       (* let ui = Ui.init () in *)
-       let%bind conn_bind =
-         Rpc.Connection.client
-           (Tcp.Where_to_connect.of_host_and_port host_and_port)
-       in
-       let conn = Result.ok_exn conn_bind in
-       let ui = Ui.init () in
-       Ui.update_hand ui !hand;
-       Ui.update_book ui !book;
-       let%bind _ =
-         (* pass in the UI when the time comes *)
-         pull_player_data ~ui ~conn ~game_id:game ~player_id:player
-       in
-       Deferred.never ())
-;;
-
 let connect_to_server =
   Command.async
     ~summary:"Join game"
@@ -210,11 +145,20 @@ let connect_to_server =
          host
          !game_id
          !player_id;
-       pull_game_state ~conn)
+       let%bind _ = waiting_room ~conn in
+       let ui = Ui.init () in
+       Ui.update_hand ui !hand;
+       Ui.update_book ui !book;
+       let%bind _ =
+         (* pass in the UI when the time comes *)
+         pull_player_data ~ui ~conn ~game_id:!game_id ~player_id:!player_id
+       in
+       Deferred.repeat_until_finished () (fun () ->
+         let%bind commodity, num_cards = Ui.manage_user_input ui in
+         let%map _ = handle_trade ~conn ~commodity ~num_cards in
+         `Repeat ()))
 ;;
 
 let command =
-  Command.group
-    ~summary:"Pit Player"
-    [ "join-game", connect_to_server; "book-data", get_book_and_hand_data ]
+  Command.group ~summary:"Pit Player" [ "join-game", connect_to_server ]
 ;;
