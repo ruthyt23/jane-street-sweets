@@ -213,29 +213,6 @@ let connect_to_server =
        pull_game_state ~conn)
 ;;
 
-(* let setup_player_data_log ~parent_window_height ~parent_window_width = let
-   log_window_width = parent_window_width / 2 in let log_window = newwin
-   parent_window_height log_window_width 0 log_window_width in box log_window
-   124 45; mvwaddstr log_window 1 1 "This will have the trade option" |>
-   prerr; wrefresh log_window |> prerr; log_window ;;
-
-   let setup_make_trade_input ~parent_window_height ~parent_window_width =
-   let player_data_wdith = parent_window_width / 2 in let player_data_window
-   = newwin parent_window_height player_data_wdith 0 0 in box
-   player_data_window 124 45; mvwaddstr player_data_window 1 1 "This will
-   have the data log" |> prerr; wrefresh player_data_window |> prerr;
-   player_data_window ;;
-
-   let ncurses_testing = Command.async ~summary:"Live updating of book data"
-   (let%map_open.Command () = return () in fun () -> let parent_window =
-   initscr () in (* Turn off input buffering *) cbreak () |> prerr; refresh
-   () |> prerr; let parent_window_height, parent_window_width = getmaxyx
-   parent_window in let player_data_window = setup_player_data_log
-   ~parent_window_height ~parent_window_width in let trade_input_window =
-   setup_make_trade_input ~parent_window_height ~parent_window_width in
-   ignore player_data_window; ignore trade_input_window; let _ = getch () in
-   let () = endwin () in return ()) ;; *)
-
 let command =
   Command.group
     ~summary:"Pit Player"
