@@ -7,7 +7,7 @@ let (connection : Rpc.Connection.t option ref) = ref None
 let game_id = ref 0
 let player_id = ref 0
 let (hand : Commodity.t list ref) = ref []
-let (book : (Commodity.t * int) list ref) = ref []
+let (book : (int * Commodity.t * int) list ref) = ref []
 
 let print_hand hand =
   print_endline "Current hand: ";
@@ -72,7 +72,7 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
            Rpc.Pipe_rpc.Pipe_response.Wait (return ())
          | Book_updated current_book ->
            book := current_book;
-           Ui.update_book ui current_book;
+           Ui.update_book ui current_book player_id;
            Rpc.Pipe_rpc.Pipe_response.Continue
          | Hand_updated current_hand ->
            hand := current_hand;
@@ -148,7 +148,7 @@ let connect_to_server =
        let%bind _ = waiting_room ~conn in
        let ui = Ui.init () in
        Ui.update_hand ui !hand;
-       Ui.update_book ui !book;
+       Ui.update_book ui !book !player_id;
        let%bind _ =
          (* pass in the UI when the time comes *)
          pull_player_data ~ui ~conn ~game_id:!game_id ~player_id:!player_id

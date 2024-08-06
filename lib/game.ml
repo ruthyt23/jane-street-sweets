@@ -14,17 +14,15 @@ type t =
   }
 [@@deriving sexp_of]
 
-let book_to_string book =
+let book_to_string book player_id =
   let str_list_book =
-    List.concat_map book ~f:(fun commodity_quantity_pair ->
-      let commodity, quantity = commodity_quantity_pair in
-      [ "("
-      ; Commodity.to_string commodity
-      ; " "
-      ; Int.to_string quantity
-      ; ")"
-      ; "   "
-      ])
+    List.concat_map book ~f:(fun (current_id, commodity, quantity) ->
+      let filtered_commodity =
+        if current_id = player_id
+        then Commodity.to_string commodity
+        else "XXXXXXX"
+      in
+      [ "("; filtered_commodity; " "; Int.to_string quantity; ")"; "   " ])
   in
   String.concat str_list_book
 ;;
@@ -221,8 +219,10 @@ let get_book_update (game : t) =
   let list_of_trade_amounts = Hashtbl.keys game.open_trades in
   let response_book =
     List.map list_of_trade_amounts ~f:(fun amount_to_trade ->
-      let _, commodity = Hashtbl.find_exn game.open_trades amount_to_trade in
-      commodity, amount_to_trade)
+      let player_id, commodity =
+        Hashtbl.find_exn game.open_trades amount_to_trade
+      in
+      player_id, commodity, amount_to_trade)
   in
   Rpcs.Player_game_data.Response.Book_updated response_book
 ;;

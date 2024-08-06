@@ -62,7 +62,8 @@ module State_manager = struct
     t.state <- Selecting_Commodity;
     t.quantity_cursor <- 0;
     t.hand_cursor <- 0;
-    t.curr_commodity_selected <- None
+    t.curr_commodity_selected <- None;
+    t.curr_quantity_selected <- None
   ;;
 
   let move_up t =
@@ -109,7 +110,7 @@ type t =
 
 let acs_codes = get_acs_codes ()
 let nice_box window = box window acs_codes.vline acs_codes.hline
-let erase_and_box window = wclear window
+let clear window = wclear window
 
 let create_hand_window parent_height parent_width =
   let height = parent_height / 2 in
@@ -132,17 +133,23 @@ let create_make_trade_window parent_height parent_width =
   let height = parent_height / 2 in
   let width = parent_width / 2 in
   let parent_window = newwin height width height width in
-  let commodity_window =
-    derwin parent_window (height - 3) ((width - 2) / 2) 2 1
-  in
+  let small_height = height - 3 in
+  let small_width = (width - 2) / 2 in
+  let commodity_window = derwin parent_window small_height small_width 2 1 in
   let quantity_window =
-    derwin parent_window (height - 3) ((width - 2) / 2) 2 (width / 2)
+    derwin parent_window small_height small_width 2 (width / 2)
   in
   nice_box parent_window;
   nice_box commodity_window;
   nice_box quantity_window;
+  let derived_commodity_window =
+    derwin commodity_window (small_height - 2) (small_width - 2) 1 1
+  in
+  let derived_quantity_window =
+    derwin quantity_window (small_height - 2) (small_width - 2) 1 1
+  in
   mvwaddstr parent_window 1 1 "Select the trade you want to make: " |> prerr;
-  parent_window, commodity_window, quantity_window
+  parent_window, derived_commodity_window, derived_quantity_window
 ;;
 
 let reset_commodity_window t =
@@ -178,12 +185,12 @@ let reset_quantity_window t =
 ;;
 
 let reset_hand_window window =
-  erase_and_box window;
+  clear window;
   waddstr window "Player Hand: " |> prerr
 ;;
 
 let reset_book_window window =
-  erase_and_box window;
+  clear window;
   waddstr window "Book Updates: " |> prerr
 ;;
 
@@ -235,13 +242,16 @@ let update_hand t (hand : Commodity.t list) =
   t.state_manager.hand_selection_list <- hand_selection_list;
   State_manager.reset t.state_manager;
   mvwaddstr t.hand_window 2 1 updated_hand |> prerr;
+  clear t.commodity_window;
+  clear t.quantity_window;
   reset_commodity_window t;
+  reset_quantity_window t;
   refresh_all_windows t
 ;;
 
-let update_book t book =
+let update_book t book player_id =
   reset_book_window t.book_window;
-  let updated_book = Game.book_to_string book in
+  let updated_book = Game.book_to_string book player_id in
   mvwaddstr t.book_window 2 1 updated_book |> prerr;
   refresh_all_windows t
 ;;
@@ -260,6 +270,7 @@ let manage_user_input t =
   timeout 0;
   noecho () |> prerr;
   curs_set 0 |> prerr;
+  State_manager.reset t.state_manager;
   Deferred.repeat_until_finished () (fun () ->
     (match t.state_manager.state with
      | State_manager.Current_state.Selecting_Commodity ->
@@ -268,21 +279,17 @@ let manage_user_input t =
        reset_quantity_window t);
     refresh_all_windows t;
     let user_input = getch () in
-    if not (user_input = -1) then printf "%d " user_input;
     match Input.of_int user_input with
     | Up ->
-      print_endline "Up reached";
       State_manager.move_up t.state_manager;
       return (`Repeat ())
     | Down ->
-      print_endline "Down reached";
       State_manager.move_down t.state_manager;
       return (`Repeat ())
     | Escape ->
       State_manager.handle_escape t.state_manager;
       return (`Repeat ())
     | Enter ->
-      print_endline "Enter reached";
       State_manager.handle_enter t.state_manager;
       (match
          ( t.state_manager.curr_commodity_selected

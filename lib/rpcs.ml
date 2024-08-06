@@ -64,7 +64,7 @@ module Player_game_data = struct
 
   module Response = struct
     type t =
-      | Book_updated of (Commodity.t * int) list
+      | Book_updated of (int * Commodity.t * int) list
       | Hand_updated of Commodity.t list
       | Game_won of (Player.t * Commodity.t) list
     [@@deriving sexp_of, bin_io]
