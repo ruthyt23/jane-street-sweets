@@ -21,8 +21,8 @@ module Input = struct
 
   let of_int value =
     match value with
-    | 65 -> Up
-    | 66 -> Down
+    | 119 -> Up (* arrow: 27 91 65 *)
+    | 115 -> Down (* arrow: 27 91 66 *)
     | 27 -> Escape
     | 10 -> Enter
     | _ -> Invalid
