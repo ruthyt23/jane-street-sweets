@@ -1,4 +1,4 @@
-# jane-street-sweets
+# Piggie
 ### By: Ruth Taddesse and Nakib Abedin
 
 #### Project Overview
