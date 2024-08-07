@@ -102,8 +102,6 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
   in
   if num_of_commodity < num_cards
   then
-    (* print_endline "Trade Rejected: Invalid number of cards - must be
-       1-4."; *)
     Deferred.return
       (Rpcs.Make_trade.Response.Trade_rejected "Not enough cards to trade")
   else if List.mem (Hashtbl.keys game.open_trades) num_cards ~equal:Int.equal
@@ -114,7 +112,6 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
     let other_player = get_player game other_player_id in
     match Player.equal player other_player with
     | true ->
-      Core.print_endline "Trade Rejected: Offer already in the book.";
       Deferred.return
         (Rpcs.Make_trade.Response.Trade_rejected
            "Trade Rejected: Offer already in the book.")
@@ -129,11 +126,6 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
         ~old_commodity:other_commodity
         ~new_commodity:commodity_to_trade
         ~num_cards;
-      Core.printf
-        "Trade of %d cards successful between player %d and %d \n"
-        num_cards
-        player.player_id
-        other_player_id;
       Hashtbl.remove game.open_trades num_cards;
       Deferred.return
         (Rpcs.Make_trade.Response.Trade_successful
@@ -145,8 +137,6 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
       ~data:(player.player_id, commodity_to_trade);
     Deferred.return Rpcs.Make_trade.Response.In_book)
 ;;
-
-(* print_endline "No matching trade found - offer placed on book") *)
 
 let generate_player_hands (game : t) =
   List.iter game.players ~f:(fun player ->

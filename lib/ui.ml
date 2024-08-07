@@ -112,6 +112,11 @@ let acs_codes = get_acs_codes ()
 let nice_box window = box window acs_codes.vline acs_codes.hline
 let clear window = wclear window
 
+let newline_addstr window message =
+  waddstr window message |> prerr;
+  waddstr window "\n" |> prerr
+;;
+
 let create_hand_window parent_height parent_width =
   let height = parent_height / 2 in
   let width = parent_width / 2 in
@@ -191,7 +196,7 @@ let reset_hand_window window =
 
 let reset_book_window window =
   clear window;
-  waddstr window "Book Updates: " |> prerr
+  newline_addstr window "Book Updates: "
 ;;
 
 let refresh_all_windows t =
@@ -245,16 +250,19 @@ let update_hand t (hand : Commodity.t list) =
   clear t.commodity_window;
   clear t.quantity_window;
   reset_commodity_window t;
-  reset_quantity_window t;
-  refresh_all_windows t
+  reset_quantity_window t
 ;;
+
+(* refresh_all_windows t *)
 
 let update_book t book player_id =
   reset_book_window t.book_window;
   let updated_book = Game.book_to_string book player_id in
-  mvwaddstr t.book_window 2 1 updated_book |> prerr;
-  refresh_all_windows t
+  newline_addstr t.book_window updated_book;
+  wrefresh t.book_window |> prerr
 ;;
+
+(* refresh_all_windows t *)
 
 let update_game_over t message =
   werase t.hand_window;
@@ -263,14 +271,15 @@ let update_game_over t message =
   refresh_all_windows t
 ;;
 
-(* let enable_trade_input t = timeout 0; ignore (getch ()); wgetstr
-   t.trade_parent_window ;; *)
+let display_trade_update t message = newline_addstr t.book_window message
 
 let manage_user_input t =
   timeout 0;
   noecho () |> prerr;
   curs_set 0 |> prerr;
   State_manager.reset t.state_manager;
+  reset_commodity_window t;
+  reset_quantity_window t;
   Deferred.repeat_until_finished () (fun () ->
     (match t.state_manager.state with
      | State_manager.Current_state.Selecting_Commodity ->
@@ -288,6 +297,8 @@ let manage_user_input t =
       return (`Repeat ())
     | Escape ->
       State_manager.handle_escape t.state_manager;
+      reset_commodity_window t;
+      reset_quantity_window t;
       return (`Repeat ())
     | Enter ->
       State_manager.handle_enter t.state_manager;

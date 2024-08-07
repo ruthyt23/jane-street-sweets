@@ -29,7 +29,7 @@ let game_over (winner_list : (Player.t * Commodity.t) list) =
       message ^ " " ^ winner.player_name)
 ;;
 
-let handle_trade ~conn ~commodity ~num_cards =
+let handle_trade ~conn ~commodity ~num_cards ~ui =
   let query =
     { Rpcs.Make_trade.Query.player_id = !player_id
     ; Rpcs.Make_trade.Query.game_id = !game_id
@@ -44,8 +44,10 @@ let handle_trade ~conn ~commodity ~num_cards =
   (match response with
    | Trade_successful _ -> ()
    | In_book ->
-     Core.print_endline "No matching trade found - offer placed on book"
-   | Trade_rejected message -> Core.print_endline message);
+     Ui.display_trade_update
+       ui
+       "No matching trade found - offer placed on book"
+   | Trade_rejected message -> Ui.display_trade_update ui message);
   return ()
 ;;
 
@@ -75,6 +77,9 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
            Ui.update_book ui current_book player_id;
            Rpc.Pipe_rpc.Pipe_response.Continue
          | Hand_updated current_hand ->
+           if List.is_empty !hand
+           then Ui.display_trade_update ui "WELCOME TO PIT!"
+           else Ui.display_trade_update ui "Trade successful!";
            hand := current_hand;
            Ui.update_hand ui current_hand;
            Rpc.Pipe_rpc.Pipe_response.Continue))
@@ -140,11 +145,6 @@ let connect_to_server =
        let initial_game_data, conn = response_from_server in
        game_id := initial_game_data.game_id;
        player_id := initial_game_data.player_id;
-       printf
-         "Connected to host %s!\nGame ID: %d\nPlayer ID: %d"
-         host
-         !game_id
-         !player_id;
        let%bind _ = waiting_room ~conn in
        let ui = Ui.init () in
        Ui.update_hand ui !hand;
@@ -155,7 +155,7 @@ let connect_to_server =
        in
        Deferred.repeat_until_finished () (fun () ->
          let%bind commodity, num_cards = Ui.manage_user_input ui in
-         let%map _ = handle_trade ~conn ~commodity ~num_cards in
+         let%map _ = handle_trade ~conn ~commodity ~num_cards ~ui in
          `Repeat ()))
 ;;
 

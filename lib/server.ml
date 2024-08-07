@@ -160,9 +160,9 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
      | Rpcs.Make_trade.Response.Trade_successful players_involved ->
        print_endline "Order Successful";
        let player_1, player_2 = players_involved in
+       let%bind () = Game.ping_book_updates game in
        let%bind () = Game.ping_player_hand_update game player_1 in
        let%bind () = Game.ping_player_hand_update game player_2 in
-       let%bind () = Game.ping_book_updates game in
        (match Game.has_winners game with
         | false -> Deferred.return result
         | true ->
