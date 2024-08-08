@@ -223,8 +223,8 @@ let get_winners_update (game : t) =
   Rpcs.Player_game_data.Response.Game_won list_of_winners
 ;;
 
-let get_trade_went_through_update player_id commodity =
-  Rpcs.Player_game_data.Response.Trade_went_through (player_id, commodity)
+let get_trade_went_through_update quantity commodity =
+  Rpcs.Player_game_data.Response.Trade_went_through (quantity, commodity)
 ;;
 
 let ping_book_updates (game : t) =
@@ -270,10 +270,11 @@ let ping_game_won_updates (game : t) =
 let ping_trade_went_through_update
   (game : t)
   (player_id_to_ping : int)
+  (quantity : int)
   (commodity : Commodity.t)
   =
   let trade_went_through_update =
-    get_trade_went_through_update player_id_to_ping commodity
+    get_trade_went_through_update quantity commodity
   in
   let listener_pair_to_ping =
     List.find game.game_listeners ~f:(fun player_listener_pair ->

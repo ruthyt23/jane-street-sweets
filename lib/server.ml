@@ -170,12 +170,14 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
        let%bind () =
          Game.ping_trade_went_through_update
            game
+           player_1
            player_1_quantity
            player_1_commodity
        in
        let%bind () =
          Game.ping_trade_went_through_update
            game
+           player_2
            player_2_quantity
            player_2_commodity
        in
