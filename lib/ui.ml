@@ -118,6 +118,14 @@ let newline_addstr window message =
   waddstr window "\n" |> prerr
 ;;
 
+let heading ?(y = 0) ?(x = 0) ~window ~text () =
+  wattr_on window (A.color_pair 1);
+  if y = 0 && x = 0
+  then newline_addstr window text
+  else mvwaddstr window y x text |> prerr;
+  wattr_off window (A.color_pair 1)
+;;
+
 let create_book_update_window parent_height parent_width =
   let height = parent_height / 2 in
   let width = parent_width / 2 in
@@ -168,7 +176,12 @@ let create_make_trade_window parent_height parent_width =
   let derived_quantity_window =
     derwin quantity_window (small_height - 2) (small_width - 2) 1 1
   in
-  mvwaddstr parent_window 1 1 "Select the trade you want to make: " |> prerr;
+  heading
+    ~window:parent_window
+    ~text:"Select the trade you want to make:"
+    ~y:1
+    ~x:1
+    ();
   parent_window, derived_commodity_window, derived_quantity_window
 ;;
 
@@ -208,17 +221,17 @@ let reset_quantity_window t =
 
 let reset_hand_window window =
   clear window;
-  waddstr window "Player Hand: " |> prerr
+  heading ~window ~text:"Player Hand:" ()
 ;;
 
 let reset_book_update_window window =
   clear window;
-  newline_addstr window "Book: "
+  heading ~window ~text:"Book:" ()
 ;;
 
 let reset_trade_update_window window =
   clear window;
-  newline_addstr window "Updates: "
+  heading ~window ~text:"Updates:" ()
 ;;
 
 let refresh_all_windows t =
@@ -257,6 +270,8 @@ let init () : t =
     ; state_manager
     }
   in
+  start_color () |> prerr;
+  init_pair 1 Color.red Color.white |> prerr;
   reset_book_update_window book_update_window;
   reset_trade_update_window trade_update_window;
   reset_commodity_window ui;
