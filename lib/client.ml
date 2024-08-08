@@ -25,8 +25,12 @@ let game_over (winner_list : (Player.t * Commodity.t) list) =
     winner_list
     ~init:game_over_message
     ~f:(fun message player_commodity_pair ->
-      let winner, _ = player_commodity_pair in
-      message ^ " " ^ winner.player_name)
+      let winner, commodity = player_commodity_pair in
+      message
+      ^ " "
+      ^ winner.player_name
+      ^ " with "
+      ^ Commodity.to_string commodity)
 ;;
 
 let handle_trade ~conn ~commodity ~num_cards ~ui =
@@ -47,7 +51,8 @@ let handle_trade ~conn ~commodity ~num_cards ~ui =
      Ui.display_trade_update
        ui
        "No matching trade found - offer placed on book"
-   | Trade_rejected message -> Ui.display_trade_update ui message);
+       false
+   | Trade_rejected message -> Ui.display_trade_update ui message false);
   return ()
 ;;
 
@@ -78,8 +83,8 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
            Rpc.Pipe_rpc.Pipe_response.Continue
          | Hand_updated current_hand ->
            if List.is_empty !hand
-           then Ui.display_trade_update ui "WELCOME TO PIT!"
-           else Ui.display_trade_update ui "Trade successful!";
+           then Ui.display_trade_update ui "WELCOME TO PIT!" true
+           else Ui.display_trade_update ui "Trade successful!" false;
            hand := current_hand;
            Ui.update_hand ui current_hand;
            Rpc.Pipe_rpc.Pipe_response.Continue))

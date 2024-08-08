@@ -104,7 +104,8 @@ type t =
   ; commodity_window : window
   ; quantity_window : window
   ; hand_window : window
-  ; book_window : window
+  ; book_update_window : window
+  ; trade_update_window : window
   ; state_manager : State_manager.t
   }
 
@@ -117,6 +118,28 @@ let newline_addstr window message =
   waddstr window "\n" |> prerr
 ;;
 
+let create_book_update_window parent_height parent_width =
+  let height = parent_height / 2 in
+  let width = parent_width / 2 in
+  let window = newwin height width 0 0 in
+  nice_box window;
+  wrefresh window |> prerr;
+  let res = derwin window (height - 2) (width - 2) 1 1 in
+  scrollok res true;
+  res
+;;
+
+let create_trade_update_window parent_height parent_width =
+  let height = parent_height / 2 in
+  let width = parent_width / 2 in
+  let window = newwin (height + 1) width height 0 in
+  nice_box window;
+  wrefresh window |> prerr;
+  let res = derwin window (height - 2) (width - 2) 1 1 in
+  scrollok res true;
+  res
+;;
+
 let create_hand_window parent_height parent_width =
   let height = parent_height / 2 in
   let width = parent_width / 2 in
@@ -126,18 +149,10 @@ let create_hand_window parent_height parent_width =
   derwin window (height - 2) (width - 2) 1 1
 ;;
 
-let create_book_window parent_height parent_width =
-  let width = parent_width / 2 in
-  let window = newwin parent_height width 0 0 in
-  nice_box window;
-  wrefresh window |> prerr;
-  derwin window (parent_height - 2) (width - 2) 1 1
-;;
-
 let create_make_trade_window parent_height parent_width =
-  let height = parent_height / 2 in
+  let height = (parent_height / 2) + 1 in
   let width = parent_width / 2 in
-  let parent_window = newwin height width height width in
+  let parent_window = newwin height width (height - 1) width in
   let small_height = height - 3 in
   let small_width = (width - 2) / 2 in
   let commodity_window = derwin parent_window small_height small_width 2 1 in
@@ -184,6 +199,8 @@ let reset_quantity_window t =
        && index = state_manager.quantity_cursor
     then wattron quantity_window Curses.A.standout
     else wattroff quantity_window Curses.A.standout;
+    (* wbkgdset quantity_window 73; *)
+    (* y := 20; *)
     mvwaddstr quantity_window !y x (Int.to_string quantity) |> prerr;
     y := !y + 1);
   wrefresh quantity_window |> prerr
@@ -194,9 +211,14 @@ let reset_hand_window window =
   waddstr window "Player Hand: " |> prerr
 ;;
 
-let reset_book_window window =
+let reset_book_update_window window =
   clear window;
-  newline_addstr window "Book Updates: "
+  newline_addstr window "Book: "
+;;
+
+let reset_trade_update_window window =
+  clear window;
+  newline_addstr window "Updates: "
 ;;
 
 let refresh_all_windows t =
@@ -204,7 +226,8 @@ let refresh_all_windows t =
   wrefresh t.trade_parent_window |> prerr;
   wrefresh t.commodity_window |> prerr;
   wrefresh t.quantity_window |> prerr;
-  wrefresh t.book_window |> prerr;
+  wrefresh t.book_update_window |> prerr;
+  wrefresh t.trade_update_window |> prerr;
   wrefresh t.hand_window |> prerr
 ;;
 
@@ -215,8 +238,9 @@ let init () : t =
   refresh () |> prerr;
   let height, width = getmaxyx parent_window in
   let state_manager = State_manager.init () in
+  let book_update_window = create_book_update_window height width in
+  let trade_update_window = create_trade_update_window height width in
   let hand_window = create_hand_window height width in
-  let book_window = create_book_window height width in
   let trade_parent_window, commodity_window, quantity_window =
     create_make_trade_window height width
   in
@@ -228,10 +252,13 @@ let init () : t =
     ; commodity_window
     ; quantity_window
     ; hand_window
-    ; book_window
+    ; book_update_window
+    ; trade_update_window
     ; state_manager
     }
   in
+  reset_book_update_window book_update_window;
+  reset_trade_update_window trade_update_window;
   reset_commodity_window ui;
   reset_quantity_window ui;
   refresh_all_windows ui;
@@ -256,22 +283,27 @@ let update_hand t (hand : Commodity.t list) =
 (* refresh_all_windows t *)
 
 let update_book t book player_id =
-  reset_book_window t.book_window;
+  reset_book_update_window t.book_update_window;
   let updated_book = Game.book_to_string book player_id in
-  newline_addstr t.book_window updated_book;
-  wrefresh t.book_window |> prerr
+  newline_addstr t.book_update_window updated_book;
+  wrefresh t.book_update_window |> prerr
 ;;
 
 (* refresh_all_windows t *)
 
 let update_game_over t message =
   werase t.hand_window;
-  werase t.book_window;
+  werase t.book_update_window;
+  werase t.trade_update_window;
   mvwaddstr t.hand_window 1 1 message |> prerr;
   refresh_all_windows t
 ;;
 
-let display_trade_update t message = newline_addstr t.book_window message
+let display_trade_update t message start =
+  if not start then ();
+  reset_trade_update_window t.trade_update_window;
+  newline_addstr t.trade_update_window message
+;;
 
 let manage_user_input t =
   timeout 0;
