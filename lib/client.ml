@@ -83,10 +83,20 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
            Rpc.Pipe_rpc.Pipe_response.Continue
          | Hand_updated current_hand ->
            if List.is_empty !hand
-           then Ui.display_trade_update ui "WELCOME TO PIT!" true
-           else Ui.display_trade_update ui "Trade successful!" false;
+           then Ui.display_trade_update ui "WELCOME TO PIT!" true;
+           (* else Ui.display_trade_update ui "Trade successful!"; *)
            hand := current_hand;
            Ui.update_hand ui current_hand;
+           Rpc.Pipe_rpc.Pipe_response.Continue
+         | Trade_went_through quantity_and_commodity ->
+           let quantity, commodity = quantity_and_commodity in
+           let message =
+             "Successfully traded "
+             ^ Int.to_string quantity
+             ^ " of "
+             ^ Commodity.to_string commodity
+           in
+           Ui.display_trade_update ui message false;
            Rpc.Pipe_rpc.Pipe_response.Continue))
 ;;
 

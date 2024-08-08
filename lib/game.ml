@@ -129,7 +129,8 @@ let handle_trade (game : t) (player : Player.t) commodity_to_trade num_cards =
       Hashtbl.remove game.open_trades num_cards;
       Deferred.return
         (Rpcs.Make_trade.Response.Trade_successful
-           (player.player_id, other_player_id)))
+           ( (player.player_id, (commodity_to_trade, num_cards))
+           , (other_player_id, (other_commodity, num_cards)) )))
   else (
     Hashtbl.add_exn
       game.open_trades
@@ -222,6 +223,10 @@ let get_winners_update (game : t) =
   Rpcs.Player_game_data.Response.Game_won list_of_winners
 ;;
 
+let get_trade_went_through_update player_id commodity =
+  Rpcs.Player_game_data.Response.Trade_went_through (player_id, commodity)
+;;
+
 let ping_book_updates (game : t) =
   let updated_book = get_book_update game in
   let%bind () =
@@ -260,4 +265,24 @@ let ping_game_won_updates (game : t) =
         listener updated_winners)
   in
   return ()
+;;
+
+let ping_trade_went_through_update
+  (game : t)
+  (player_id_to_ping : int)
+  (commodity : Commodity.t)
+  =
+  let trade_went_through_update =
+    get_trade_went_through_update player_id_to_ping commodity
+  in
+  let listener_pair_to_ping =
+    List.find game.game_listeners ~f:(fun player_listener_pair ->
+      let player_id, _ = player_listener_pair in
+      Int.equal player_id player_id_to_ping)
+  in
+  match listener_pair_to_ping with
+  | None -> failwith "Trying to ping to a listener that doesn't exist"
+  | Some listener_pair ->
+    let _, listener = listener_pair in
+    listener trade_went_through_update
 ;;

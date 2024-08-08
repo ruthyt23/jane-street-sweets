@@ -64,6 +64,7 @@ module Player_game_data = struct
 
   module Response = struct
     type t =
+      | Trade_went_through of (int * Commodity.t)
       | Book_updated of (int * Commodity.t * int) list
       | Hand_updated of Commodity.t list
       | Game_won of (Player.t * Commodity.t) list
@@ -99,7 +100,9 @@ module Make_trade = struct
   module Response = struct
     type t =
       (* Trade happened between player1 and player2 *)
-      | Trade_successful of (int * int)
+      | Trade_successful of
+          ((Player.Player_id.t * (Commodity.t * int))
+          * (Player.Player_id.t * (Commodity.t * int)))
       | In_book
       | Trade_rejected of string
     [@@deriving sexp_of, bin_io]

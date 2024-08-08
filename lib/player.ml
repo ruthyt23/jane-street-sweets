@@ -1,9 +1,10 @@
 open! Async
 open! Core
 open! Fzf
+module Player_id = Int
 
 type t =
-  { player_id : int
+  { player_id : Player_id.t
   ; player_name : string
   ; mutable hand : Commodity.t list
   }

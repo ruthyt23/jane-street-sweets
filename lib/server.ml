@@ -157,12 +157,28 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
      | Rpcs.Make_trade.Response.Trade_rejected msg ->
        print_endline msg;
        Deferred.return result
-     | Rpcs.Make_trade.Response.Trade_successful players_involved ->
+     | Rpcs.Make_trade.Response.Trade_successful trade_data ->
        print_endline "Order Successful";
-       let player_1, player_2 = players_involved in
+       let player_1_data, player_2_data = trade_data in
+       let player_1, player_1_trade = player_1_data in
+       let player_1_commodity, player_1_quantity = player_1_trade in
+       let player_2, player_2_trade = player_2_data in
+       let player_2_commodity, player_2_quantity = player_2_trade in
        let%bind () = Game.ping_book_updates game in
        let%bind () = Game.ping_player_hand_update game player_1 in
        let%bind () = Game.ping_player_hand_update game player_2 in
+       let%bind () =
+         Game.ping_trade_went_through_update
+           game
+           player_1_quantity
+           player_1_commodity
+       in
+       let%bind () =
+         Game.ping_trade_went_through_update
+           game
+           player_2_quantity
+           player_2_commodity
+       in
        (match Game.has_winners game with
         | false -> Deferred.return result
         | true ->

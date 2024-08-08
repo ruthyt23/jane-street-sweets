@@ -1,6 +1,7 @@
 open! Async
 open! Core
 open! Fzf
+module Player_id = Int
 
 type t =
   { player_id : int
