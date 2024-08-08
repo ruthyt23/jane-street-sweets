@@ -88,13 +88,15 @@ let pull_player_data ~(ui : Ui.t) ~conn ~game_id ~player_id =
            hand := current_hand;
            Ui.update_hand ui current_hand;
            Rpc.Pipe_rpc.Pipe_response.Continue
-         | Trade_went_through quantity_and_commodity ->
-           let quantity, commodity = quantity_and_commodity in
+         | Trade_went_through trade_data ->
+           let quantity, old_commodity, new_commodity = trade_data in
            let message =
              "Successfully traded "
              ^ Int.to_string quantity
              ^ " of "
-             ^ Commodity.to_string commodity
+             ^ Commodity.to_string old_commodity
+             ^ " for "
+             ^ Commodity.to_string new_commodity
            in
            Ui.display_trade_update ui message false;
            Rpc.Pipe_rpc.Pipe_response.Continue))

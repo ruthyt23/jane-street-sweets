@@ -64,7 +64,8 @@ module Player_game_data = struct
 
   module Response = struct
     type t =
-      | Trade_went_through of (int * Commodity.t)
+      (* Traded n of Commodity.t for other Commodity.t *)
+      | Trade_went_through of (int * Commodity.t * Commodity.t)
       | Book_updated of (int * Commodity.t * int) list
       | Hand_updated of Commodity.t list
       | Game_won of (Player.t * Commodity.t) list

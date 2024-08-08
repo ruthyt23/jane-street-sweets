@@ -173,6 +173,7 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
            player_1
            player_1_quantity
            player_1_commodity
+           player_2_commodity
        in
        let%bind () =
          Game.ping_trade_went_through_update
@@ -180,6 +181,7 @@ let make_trade_handle (_client : unit) (query : Rpcs.Make_trade.Query.t) =
            player_2
            player_2_quantity
            player_2_commodity
+           player_1_commodity
        in
        (match Game.has_winners game with
         | false -> Deferred.return result
