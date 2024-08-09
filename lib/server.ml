@@ -1,6 +1,5 @@
 open! Core
 open! Async
-open! Fzf
 
 module Player_id_manager = struct
   type t = int ref
