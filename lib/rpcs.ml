@@ -1,6 +1,5 @@
 open! Core
 open! Async
-open! Fzf
 
 module Waiting_room = struct
   module Query = struct

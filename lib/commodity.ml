@@ -1,6 +1,5 @@
 open! Async
 open! Core
-open! Fzf
 
 type t =
   | Fairlife

@@ -1,6 +1,5 @@
 open! Core
 open! Async
-open! Fzf
 open Curses
 
 let prerr err =

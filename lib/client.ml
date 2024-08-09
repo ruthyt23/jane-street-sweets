@@ -1,9 +1,7 @@
 open! Core
 open! Async
-open! Fzf
 open! Curses
 
-let (connection : Rpc.Connection.t option ref) = ref None
 let game_id = ref 0
 let player_id = ref 0
 let (hand : Commodity.t list ref) = ref []

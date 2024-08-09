@@ -1,6 +1,5 @@
 open! Async
 open! Core
-open! Fzf
 
 type t [@@deriving equal, enumerate, compare, sexp_of, hash, bin_io]
 
