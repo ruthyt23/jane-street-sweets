@@ -295,16 +295,12 @@ let update_hand t (hand : Commodity.t list) =
   reset_quantity_window t
 ;;
 
-(* refresh_all_windows t *)
-
 let update_book t book player_id =
   reset_book_update_window t.book_update_window;
   let updated_book = Game.book_to_string book player_id in
   newline_addstr t.book_update_window updated_book;
   wrefresh t.book_update_window |> prerr
 ;;
-
-(* refresh_all_windows t *)
 
 let update_game_over t message =
   werase t.hand_window;
