@@ -8,7 +8,7 @@ A web-based game inspired by Pit, where players blindly trade commodities in an 
 0. Clone this repository and cd into it
 1. Install all dependcies by doing `opam install .`
 2. Build our project by doing `dune build`
-3. Get the server up and running by doing `dune exec ./bin/server.exe -- start-game -port 10000`. Note that the port number can be different but you must call the same port from the client side.
+3. Get the server up and running by doing `dune exec ./bin/server.exe -- start-server -port 10000`. Note that the port number can be different but you must call the same port from the client side.
 4. Join the game from the client side by running `dune exec ./bin/client.exe -- join-game -name "name" -players 3 -host "Hostname of the server" -port 10000`. Players represents the number of players you want in your game. Hostname and port must match the hostname and port of the server. Name represents your name.
 5. Have Fun!
 
